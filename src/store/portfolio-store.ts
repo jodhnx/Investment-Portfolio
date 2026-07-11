@@ -3,8 +3,10 @@
 import { create } from "zustand";
 import { subscribeWithSelector } from "zustand/middleware";
 import { v4 as uuidv4 } from "uuid";
+import { toast } from "sonner";
 import type {
   AppState,
+  AppSettings,
   AssetSearchResult,
   Category,
   Dividend,
@@ -13,21 +15,43 @@ import type {
   PriceAlert,
   Transaction,
 } from "@/lib/types";
+import type { Profile } from "@/lib/supabase/database.types";
 import { generateSnapshot } from "@/lib/calculations";
+import { loadUserData } from "@/lib/supabase/queries";
 import {
-  createDefaultPortfolio,
-  createInitialState,
-  loadState,
-  positionFromSearch,
-  saveState,
-} from "@/lib/storage";
+  syncAssetDelete,
+  syncAssetInsert,
+  syncAssetUpdate,
+  syncDividendInsert,
+  syncPortfolioDelete,
+  syncPortfolioInsert,
+  syncPortfolioUpdate,
+  syncPriceUpdates,
+  syncProfileUpdate,
+  syncSnapshotInsert,
+  syncTransactionInsert,
+  syncWatchlistDelete,
+  syncWatchlistInsert,
+} from "@/lib/supabase/sync";
+import { positionFromSearch } from "@/lib/storage";
 
 const MAX_HISTORY = 50;
 
+const emptyState: AppState = {
+  portfolios: [],
+  activePortfolioId: "",
+  snapshots: {},
+  settings: { theme: "dark", defaultCurrency: "EUR", priceRefreshInterval: 60000 },
+  history: [],
+  historyIndex: -1,
+};
+
 interface PortfolioStore extends AppState {
   hydrated: boolean;
-  hydrate: () => void;
-  persist: () => void;
+  profile: Profile | null;
+  profileId: string | null;
+  hydrate: () => Promise<void>;
+  reset: () => void;
   pushHistory: () => void;
   undo: () => void;
   redo: () => void;
@@ -36,7 +60,7 @@ interface PortfolioStore extends AppState {
   updatePortfolio: (id: string, data: Partial<Portfolio>) => void;
   deletePortfolio: (id: string) => void;
   addPosition: (position: Position) => void;
-  addPositionFromSearch: (asset: AssetSearchResult) => void;
+  addPositionFromSearch: (asset: AssetSearchResult, watchlist?: boolean) => void;
   updatePosition: (id: string, data: Partial<Position>) => void;
   deletePosition: (id: string) => void;
   addTransaction: (positionId: string, tx: Omit<Transaction, "id">) => void;
@@ -47,7 +71,8 @@ interface PortfolioStore extends AppState {
   addSnapshot: (portfolioId: string) => void;
   importPositions: (positions: Partial<Position>[]) => void;
   getActivePortfolio: () => Portfolio | undefined;
-  updateSettings: (settings: Partial<AppState["settings"]>) => void;
+  updateSettings: (settings: Partial<AppSettings>) => void;
+  updateProfile: (data: Partial<Profile>) => void;
 }
 
 function withUpdatedPortfolio(
@@ -63,28 +88,44 @@ function withUpdatedPortfolio(
   };
 }
 
+function handleSyncError(error: string | null, action: string) {
+  if (error) {
+    toast.error(`Sync fehlgeschlagen: ${action}`, { description: error });
+  }
+}
+
 export const usePortfolioStore = create<PortfolioStore>()(
   subscribeWithSelector((set, get) => ({
-    ...createInitialState(),
+    ...emptyState,
     hydrated: false,
+    profile: null,
+    profileId: null,
 
-    hydrate: () => {
-      const loaded = loadState();
-      set({ ...loaded, hydrated: true });
+    hydrate: async () => {
+      try {
+        const data = await loadUserData();
+        if (!data) {
+          set({ ...emptyState, hydrated: true });
+          return;
+        }
+        set({
+          portfolios: data.portfolios,
+          activePortfolioId: data.portfolios[0]?.id ?? "",
+          snapshots: data.snapshots,
+          settings: data.settings,
+          profile: data.profile,
+          profileId: data.profile.id,
+          hydrated: true,
+          history: [],
+          historyIndex: -1,
+        });
+      } catch {
+        toast.error("Daten konnten nicht geladen werden.");
+        set({ hydrated: true });
+      }
     },
 
-    persist: () => {
-      const state = get();
-      if (!state.hydrated) return;
-      saveState({
-        portfolios: state.portfolios,
-        activePortfolioId: state.activePortfolioId,
-        snapshots: state.snapshots,
-        settings: state.settings,
-        history: [],
-        historyIndex: -1,
-      });
-    },
+    reset: () => set({ ...emptyState, hydrated: true, profile: null, profileId: null }),
 
     pushHistory: () => {
       const { portfolios, activePortfolioId, snapshots, settings } = get();
@@ -106,12 +147,7 @@ export const usePortfolioStore = create<PortfolioStore>()(
       const { historyIndex, history } = get();
       if (historyIndex < 0) return;
       const prev = history[historyIndex];
-      set({
-        ...prev,
-        history,
-        historyIndex: historyIndex - 1,
-      });
-      get().persist();
+      set({ ...prev, history, historyIndex: historyIndex - 1, profile: get().profile, profileId: get().profileId, hydrated: true });
     },
 
     redo: () => {
@@ -119,12 +155,7 @@ export const usePortfolioStore = create<PortfolioStore>()(
       if (historyIndex >= history.length - 2) return;
       const next = history[historyIndex + 2];
       if (!next) return;
-      set({
-        ...next,
-        history,
-        historyIndex: historyIndex + 1,
-      });
-      get().persist();
+      set({ ...next, history, historyIndex: historyIndex + 1, profile: get().profile, profileId: get().profileId, hydrated: true });
     },
 
     getActivePortfolio: () =>
@@ -134,21 +165,34 @@ export const usePortfolioStore = create<PortfolioStore>()(
 
     addPortfolio: (name) => {
       get().pushHistory();
-      const portfolio = createDefaultPortfolio(name);
+      const profileId = get().profileId;
+      if (!profileId) return;
+      const portfolio: Portfolio = {
+        id: uuidv4(),
+        name,
+        currency: get().settings.defaultCurrency,
+        color: "#6366f1",
+        positions: [],
+        categories: [],
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+      };
       set((s) => ({
         portfolios: [...s.portfolios, portfolio],
         activePortfolioId: portfolio.id,
         snapshots: { ...s.snapshots, [portfolio.id]: [] },
       }));
-      get().persist();
+      syncPortfolioInsert(profileId, portfolio).then(({ error }) =>
+        handleSyncError(error, "Portfolio erstellen")
+      );
     },
 
     updatePortfolio: (id, data) => {
       get().pushHistory();
-      set((s) =>
-        withUpdatedPortfolio(s, id, (p) => ({ ...p, ...data }))
+      set((s) => withUpdatedPortfolio(s, id, (p) => ({ ...p, ...data })));
+      syncPortfolioUpdate(id, data).then(({ error }) =>
+        handleSyncError(error, "Portfolio aktualisieren")
       );
-      get().persist();
     },
 
     deletePortfolio: (id) => {
@@ -158,57 +202,97 @@ export const usePortfolioStore = create<PortfolioStore>()(
         return {
           portfolios,
           activePortfolioId:
-            s.activePortfolioId === id
-              ? portfolios[0]?.id ?? ""
-              : s.activePortfolioId,
+            s.activePortfolioId === id ? portfolios[0]?.id ?? "" : s.activePortfolioId,
         };
       });
-      get().persist();
+      syncPortfolioDelete(id).then(({ error }) =>
+        handleSyncError(error, "Portfolio löschen")
+      );
     },
 
     addPosition: (position) => {
       get().pushHistory();
       const pid = get().activePortfolioId;
+      const profileId = get().profileId;
       set((s) =>
         withUpdatedPortfolio(s, pid, (p) => ({
           ...p,
           positions: [...p.positions, position],
         }))
       );
-      get().persist();
+      if (position.isWatchlist && profileId) {
+        syncWatchlistInsert(profileId, position.id, {
+          id: position.externalId ?? position.symbol,
+          name: position.name,
+          symbol: position.symbol,
+          type: position.type,
+          logoUrl: position.logoUrl,
+          currentPrice: position.currentPrice,
+        }).then(({ error }) => handleSyncError(error, "Watchlist"));
+      } else {
+        syncAssetInsert(position, pid).then(({ error }) =>
+          handleSyncError(error, "Asset hinzufügen")
+        );
+      }
     },
 
-    addPositionFromSearch: (asset) => {
-      const position = positionFromSearch(asset, get().activePortfolioId);
-      get().addPosition(position);
+    addPositionFromSearch: (asset, watchlist = false) => {
+      if (watchlist) {
+        const now = new Date().toISOString();
+        get().addPosition({
+          id: uuidv4(),
+          name: asset.name,
+          symbol: asset.symbol,
+          type: asset.type,
+          logoUrl: asset.logoUrl,
+          externalId: asset.id,
+          currentPrice: asset.currentPrice,
+          transactions: [],
+          dividends: [],
+          priceAlerts: [],
+          isWatchlist: true,
+          createdAt: now,
+          updatedAt: now,
+        });
+      } else {
+        const position = positionFromSearch(asset, get().activePortfolioId);
+        get().addPosition(position);
+      }
     },
 
     updatePosition: (id, data) => {
       get().pushHistory();
       const pid = get().activePortfolioId;
+      const pos = get().getActivePortfolio()?.positions.find((p) => p.id === id);
       set((s) =>
         withUpdatedPortfolio(s, pid, (p) => ({
           ...p,
           positions: p.positions.map((pos) =>
-            pos.id === id
-              ? { ...pos, ...data, updatedAt: new Date().toISOString() }
-              : pos
+            pos.id === id ? { ...pos, ...data, updatedAt: new Date().toISOString() } : pos
           ),
         }))
       );
-      get().persist();
+      if (pos?.isWatchlist) return;
+      syncAssetUpdate(id, data).then(({ error }) =>
+        handleSyncError(error, "Asset aktualisieren")
+      );
     },
 
     deletePosition: (id) => {
       get().pushHistory();
       const pid = get().activePortfolioId;
+      const pos = get().getActivePortfolio()?.positions.find((p) => p.id === id);
       set((s) =>
         withUpdatedPortfolio(s, pid, (p) => ({
           ...p,
           positions: p.positions.filter((pos) => pos.id !== id),
         }))
       );
-      get().persist();
+      if (pos?.isWatchlist) {
+        syncWatchlistDelete(id).then(({ error }) => handleSyncError(error, "Watchlist"));
+      } else {
+        syncAssetDelete(id).then(({ error }) => handleSyncError(error, "Asset löschen"));
+      }
     },
 
     addTransaction: (positionId, tx) => {
@@ -220,16 +304,14 @@ export const usePortfolioStore = create<PortfolioStore>()(
           ...p,
           positions: p.positions.map((pos) =>
             pos.id === positionId
-              ? {
-                  ...pos,
-                  transactions: [...pos.transactions, transaction],
-                  updatedAt: new Date().toISOString(),
-                }
+              ? { ...pos, transactions: [...pos.transactions, transaction], updatedAt: new Date().toISOString() }
               : pos
           ),
         }))
       );
-      get().persist();
+      syncTransactionInsert(transaction, positionId).then(({ error }) =>
+        handleSyncError(error, "Transaktion speichern")
+      );
     },
 
     addDividend: (positionId, div) => {
@@ -240,34 +322,44 @@ export const usePortfolioStore = create<PortfolioStore>()(
         withUpdatedPortfolio(s, pid, (p) => ({
           ...p,
           positions: p.positions.map((pos) =>
-            pos.id === positionId
-              ? { ...pos, dividends: [...pos.dividends, dividend] }
-              : pos
+            pos.id === positionId ? { ...pos, dividends: [...pos.dividends, dividend] } : pos
           ),
         }))
       );
-      get().persist();
+      syncDividendInsert(dividend, positionId).then(({ error }) =>
+        handleSyncError(error, "Dividende speichern")
+      );
     },
 
     addPriceAlert: (positionId, alert) => {
       get().pushHistory();
       const pid = get().activePortfolioId;
-      const priceAlert: PriceAlert = {
-        ...alert,
-        id: uuidv4(),
-        triggered: false,
-      };
+      const profileId = get().profileId;
+      const pos = get().getActivePortfolio()?.positions.find((p) => p.id === positionId);
+      const priceAlert: PriceAlert = { ...alert, id: uuidv4(), triggered: false };
       set((s) =>
         withUpdatedPortfolio(s, pid, (p) => ({
           ...p,
           positions: p.positions.map((pos) =>
-            pos.id === positionId
-              ? { ...pos, priceAlerts: [...pos.priceAlerts, priceAlert] }
-              : pos
+            pos.id === positionId ? { ...pos, priceAlerts: [...pos.priceAlerts, priceAlert] } : pos
           ),
         }))
       );
-      get().persist();
+      if (profileId && pos) {
+        import("@/lib/supabase/client").then(({ createClient }) => {
+          createClient()
+            .from("price_alerts")
+            .insert({
+              id: priceAlert.id,
+              profile_id: profileId,
+              symbol: pos.symbol,
+              target_price: alert.targetPrice,
+              direction: alert.condition,
+              enabled: alert.active,
+            })
+            .then(({ error }) => handleSyncError(error?.message ?? null, "Preisalarm"));
+        });
+      }
     },
 
     addCategory: (category) => {
@@ -275,16 +367,15 @@ export const usePortfolioStore = create<PortfolioStore>()(
       const pid = get().activePortfolioId;
       const cat: Category = { ...category, id: uuidv4() };
       set((s) =>
-        withUpdatedPortfolio(s, pid, (p) => ({
-          ...p,
-          categories: [...p.categories, cat],
-        }))
+        withUpdatedPortfolio(s, pid, (p) => ({ ...p, categories: [...p.categories, cat] }))
       );
-      get().persist();
     },
 
     updatePrices: (updates) => {
       const pid = get().activePortfolioId;
+      const portfolio = get().portfolios.find((p) => p.id === pid);
+      if (!portfolio) return;
+
       set((s) =>
         withUpdatedPortfolio(s, pid, (p) => ({
           ...p,
@@ -301,7 +392,16 @@ export const usePortfolioStore = create<PortfolioStore>()(
           }),
         }))
       );
-      get().persist();
+
+      syncPriceUpdates(
+        updates,
+        portfolio.positions.map((p) => ({
+          id: p.id,
+          externalId: p.externalId,
+          symbol: p.symbol,
+          isWatchlist: p.isWatchlist,
+        }))
+      );
     },
 
     addSnapshot: (portfolioId) => {
@@ -314,47 +414,62 @@ export const usePortfolioStore = create<PortfolioStore>()(
           [portfolioId]: [...(s.snapshots[portfolioId] ?? []), snap].slice(-365),
         },
       }));
-      get().persist();
+      syncSnapshotInsert(portfolioId, snap.totalValue, snap.invested).then(({ error }) =>
+        handleSyncError(error, "Snapshot speichern")
+      );
     },
 
     importPositions: (positions) => {
       get().pushHistory();
       const pid = get().activePortfolioId;
+      const newPositions = positions.filter(Boolean).map((pos) => ({
+        ...(pos as Position),
+        id: pos.id ?? uuidv4(),
+        transactions: pos.transactions ?? [],
+        dividends: pos.dividends ?? [],
+        priceAlerts: pos.priceAlerts ?? [],
+        isWatchlist: false,
+        createdAt: pos.createdAt ?? new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+      }));
       set((s) =>
         withUpdatedPortfolio(s, pid, (p) => ({
           ...p,
-          positions: [
-            ...p.positions,
-            ...positions.filter(Boolean).map((pos) => ({
-              ...(pos as Position),
-              id: pos.id ?? uuidv4(),
-              transactions: pos.transactions ?? [],
-              dividends: pos.dividends ?? [],
-              priceAlerts: pos.priceAlerts ?? [],
-              isWatchlist: pos.isWatchlist ?? false,
-              createdAt: pos.createdAt ?? new Date().toISOString(),
-              updatedAt: new Date().toISOString(),
-            })),
-          ],
+          positions: [...p.positions, ...newPositions],
         }))
       );
-      get().persist();
+      newPositions.forEach((pos) => {
+        syncAssetInsert(pos, pid).then(({ error }) => {
+          if (!error && pos.transactions.length) {
+            pos.transactions.forEach((tx) =>
+              syncTransactionInsert(tx, pos.id)
+            );
+          }
+        });
+      });
     },
 
     updateSettings: (settings) => {
       set((s) => ({ settings: { ...s.settings, ...settings } }));
-      get().persist();
+      const profileId = get().profileId;
+      if (profileId && settings.defaultCurrency) {
+        syncProfileUpdate(profileId, { currency: settings.defaultCurrency });
+      }
+    },
+
+    updateProfile: (data) => {
+      const profileId = get().profileId;
+      if (!profileId) return;
+      set((s) => ({
+        profile: s.profile ? { ...s.profile, ...data } : null,
+      }));
+      syncProfileUpdate(profileId, {
+        name: data.name ?? undefined,
+        avatar: data.avatar ?? undefined,
+        currency: data.currency ?? undefined,
+        country: data.country ?? undefined,
+        language: data.language ?? undefined,
+      }).then(({ error }) => handleSyncError(error, "Profil aktualisieren"));
     },
   }))
 );
-
-if (typeof window !== "undefined") {
-  usePortfolioStore.subscribe(
-    (s) => s.portfolios,
-    () => {
-      if (usePortfolioStore.getState().hydrated) {
-        usePortfolioStore.getState().persist();
-      }
-    }
-  );
-}

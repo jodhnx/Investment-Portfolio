@@ -63,7 +63,7 @@ export default function ImportExportPage() {
       <div>
         <h2 className="text-2xl font-bold tracking-tight">Import / Export</h2>
         <p className="text-sm text-muted-foreground">
-          Daten importieren, exportieren und sichern
+          Daten importieren, exportieren – alle Änderungen werden automatisch mit Supabase synchronisiert
         </p>
       </div>
 

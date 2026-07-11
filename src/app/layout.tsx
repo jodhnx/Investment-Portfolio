@@ -1,7 +1,9 @@
 import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
+import { Suspense } from "react";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { ThemeProvider } from "@/components/providers/theme-provider";
+import { AuthProvider } from "@/components/providers/auth-provider";
 import { StoreHydrator } from "@/components/providers/store-hydrator";
 import { Toaster } from "@/components/ui/sonner";
 import "./globals.css";
@@ -36,8 +38,12 @@ export default function RootLayout({
       <body className="min-h-full flex flex-col">
         <TooltipProvider>
           <ThemeProvider>
-            <StoreHydrator>{children}</StoreHydrator>
-            <Toaster richColors position="bottom-right" />
+            <AuthProvider>
+              <Suspense>
+                <StoreHydrator>{children}</StoreHydrator>
+              </Suspense>
+              <Toaster richColors position="bottom-right" />
+            </AuthProvider>
           </ThemeProvider>
         </TooltipProvider>
       </body>

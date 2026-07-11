@@ -24,7 +24,6 @@ import { Badge } from "@/components/ui/badge";
 import { usePortfolioStore } from "@/store/portfolio-store";
 import type { AssetSearchResult } from "@/lib/types";
 import { assetTypeLabel } from "@/hooks/use-price-updater";
-import { v4 as uuidv4 } from "uuid";
 
 interface AddAssetDialogProps {
   watchlist?: boolean;
@@ -68,22 +67,7 @@ export function AddAssetDialog({ watchlist = false }: AddAssetDialogProps) {
     if (!selected) return;
 
     if (watchlist) {
-      const now = new Date().toISOString();
-      addPosition({
-        id: uuidv4(),
-        name: selected.name,
-        symbol: selected.symbol,
-        type: selected.type,
-        logoUrl: selected.logoUrl,
-        externalId: selected.id,
-        currentPrice: selected.currentPrice,
-        transactions: [],
-        dividends: [],
-        priceAlerts: [],
-        isWatchlist: true,
-        createdAt: now,
-        updatedAt: now,
-      });
+      addPositionFromSearch(selected, true);
     } else {
       addPositionFromSearch(selected);
       const portfolio = usePortfolioStore.getState().getActivePortfolio();
