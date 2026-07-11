@@ -1,6 +1,6 @@
 "use client";
 
-import { createContext, useContext, useEffect, useState } from "react";
+import { createContext, useContext, useCallback, useMemo, useEffect } from "react";
 import { usePortfolioStore } from "@/store/portfolio-store";
 
 type Theme = "dark" | "light";
@@ -11,30 +11,21 @@ const ThemeContext = createContext<{
 }>({ theme: "dark", toggleTheme: () => {} });
 
 export function ThemeProvider({ children }: { children: React.ReactNode }) {
-  const settingsTheme = usePortfolioStore((s) => s.settings.theme);
+  const theme = usePortfolioStore((s) => s.settings.theme);
   const updateSettings = usePortfolioStore((s) => s.updateSettings);
-  const [theme, setTheme] = useState<Theme>("dark");
 
   useEffect(() => {
-    setTheme(settingsTheme);
-  }, [settingsTheme]);
-
-  useEffect(() => {
-    const root = document.documentElement;
-    root.classList.toggle("dark", theme === "dark");
+    document.documentElement.classList.toggle("dark", theme === "dark");
   }, [theme]);
 
-  const toggleTheme = () => {
-    const next = theme === "dark" ? "light" : "dark";
-    setTheme(next);
+  const toggleTheme = useCallback(() => {
+    const next: Theme = theme === "dark" ? "light" : "dark";
     updateSettings({ theme: next });
-  };
+  }, [theme, updateSettings]);
 
-  return (
-    <ThemeContext.Provider value={{ theme, toggleTheme }}>
-      {children}
-    </ThemeContext.Provider>
-  );
+  const value = useMemo(() => ({ theme, toggleTheme }), [theme, toggleTheme]);
+
+  return <ThemeContext.Provider value={value}>{children}</ThemeContext.Provider>;
 }
 
 export const useTheme = () => useContext(ThemeContext);

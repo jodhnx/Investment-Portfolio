@@ -1,6 +1,6 @@
 "use client";
 
-import { createContext, useContext, useEffect, useState, useCallback } from "react";
+import { createContext, useContext, useEffect, useState, useCallback, useMemo, useRef } from "react";
 import type { User, Session } from "@supabase/supabase-js";
 import { createClient, resetBrowserClient } from "@/lib/supabase/client";
 import { syncProfileFromUser } from "@/lib/auth/profile-sync";
@@ -27,8 +27,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [session, setSession] = useState<Session | null>(null);
   const [loading, setLoading] = useState(true);
-  const hydrate = usePortfolioStore((s) => s.hydrate);
   const reset = usePortfolioStore((s) => s.reset);
+  const listenerRegistered = useRef(false);
 
   const refreshSession = useCallback(async () => {
     try {
@@ -46,6 +46,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   useEffect(() => {
+    if (listenerRegistered.current) return;
+    listenerRegistered.current = true;
+
     const supabase = createClient();
 
     supabase.auth.getSession().then(({ data: { session: s }, error }) => {
@@ -58,31 +61,37 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
     const {
       data: { subscription },
-    } = supabase.auth.onAuthStateChange(async (event, s) => {
+    } = supabase.auth.onAuthStateChange((event, s) => {
       logAuthDebug("authStateChange", { event, userId: s?.user?.id });
+
       setSession(s);
       setUser(s?.user ?? null);
       setLoading(false);
 
+      // Async-Arbeit außerhalb des Callbacks (Supabase Best Practice)
       if (event === "SIGNED_IN" && s?.user?.email_confirmed_at) {
-        const supabase = createClient();
-        await syncProfileFromUser(supabase, s.user);
-        await hydrate();
+        queueMicrotask(async () => {
+          try {
+            await syncProfileFromUser(supabase, s.user);
+          } catch (err) {
+            logAuthError("authStateChange:profile", err);
+          }
+        });
       }
+
       if (event === "SIGNED_OUT") {
         reset();
         resetBrowserClient();
       }
-      if (event === "TOKEN_REFRESHED" && s) {
-        setSession(s);
-        setUser(s.user);
-      }
     });
 
-    return () => subscription.unsubscribe();
-  }, [hydrate, reset]);
+    return () => {
+      listenerRegistered.current = false;
+      subscription.unsubscribe();
+    };
+  }, [reset]);
 
-  const signOut = async () => {
+  const signOut = useCallback(async () => {
     try {
       const supabase = createClient();
       const { error } = await supabase.auth.signOut({ scope: "global" });
@@ -94,13 +103,14 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     setSession(null);
     reset();
     resetBrowserClient();
-  };
+  }, [reset]);
 
-  return (
-    <AuthContext.Provider value={{ user, session, loading, signOut, refreshSession }}>
-      {children}
-    </AuthContext.Provider>
+  const value = useMemo(
+    () => ({ user, session, loading, signOut, refreshSession }),
+    [user, session, loading, signOut, refreshSession]
   );
+
+  return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 }
 
 export const useAuth = () => useContext(AuthContext);

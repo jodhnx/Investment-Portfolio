@@ -1,15 +1,20 @@
 "use client";
 
-import { useEffect, useCallback } from "react";
+import { useEffect, useRef, useCallback } from "react";
 import { usePortfolioStore } from "@/store/portfolio-store";
-import type { AssetType } from "@/lib/types";
 
+/** Preis-Updates – nur einmal pro Layout mounten, nicht pro Komponente */
 export function usePriceUpdater() {
-  const portfolio = usePortfolioStore((s) => s.getActivePortfolio());
+  const activePortfolioId = usePortfolioStore((s) => s.activePortfolioId);
+  const positionCount = usePortfolioStore(
+    (s) => s.portfolios.find((p) => p.id === s.activePortfolioId)?.positions.length ?? 0
+  );
   const updatePrices = usePortfolioStore((s) => s.updatePrices);
   const interval = usePortfolioStore((s) => s.settings.priceRefreshInterval);
+  const mountedRef = useRef(false);
 
   const refresh = useCallback(async () => {
+    const portfolio = usePortfolioStore.getState().getActivePortfolio();
     if (!portfolio) return;
 
     const cryptoIds = portfolio.positions
@@ -34,12 +39,9 @@ export function usePriceUpdater() {
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ ids: cryptoIds }),
         });
-        if (res.ok) {
-          const data = await res.json();
-          Object.assign(updates, data);
-        }
+        if (res.ok) Object.assign(updates, await res.json());
       } catch {
-        // offline fallback
+        // offline
       }
     }
 
@@ -50,31 +52,44 @@ export function usePriceUpdater() {
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ symbols: stockSymbols }),
         });
-        if (res.ok) {
-          const data = await res.json();
-          Object.assign(updates, data);
-        }
+        if (res.ok) Object.assign(updates, await res.json());
       } catch {
-        // offline fallback
+        // offline
       }
     }
 
     if (Object.keys(updates).length) {
       updatePrices(updates);
     }
-  }, [portfolio, updatePrices]);
+  }, [updatePrices]);
 
   useEffect(() => {
+    if (!activePortfolioId || positionCount === 0) return;
+
+    // Nur einmal initial fetchen wenn Portfolio/Positionen sich ändern
     refresh();
     const timer = setInterval(refresh, interval);
     return () => clearInterval(timer);
-  }, [refresh, interval]);
+  }, [activePortfolioId, positionCount, interval, refresh]);
+
+  // Verhindert doppeltes Mounten in Strict Mode
+  useEffect(() => {
+    mountedRef.current = true;
+    return () => {
+      mountedRef.current = false;
+    };
+  }, []);
 
   return { refresh };
 }
 
-export function assetTypeLabel(type: AssetType): string {
-  const labels: Record<AssetType, string> = {
+export function PriceUpdater() {
+  usePriceUpdater();
+  return null;
+}
+
+export function assetTypeLabel(type: import("@/lib/types").AssetType): string {
+  const labels: Record<import("@/lib/types").AssetType, string> = {
     CRYPTO: "Krypto",
     STOCK: "Aktie",
     ETF: "ETF",

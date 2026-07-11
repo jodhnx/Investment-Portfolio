@@ -6,11 +6,11 @@ import { StatsCards } from "@/components/dashboard/stats-cards";
 import { PortfolioChart } from "@/components/dashboard/portfolio-chart";
 import { AllocationChart } from "@/components/dashboard/allocation-chart";
 import { computePortfolioStats } from "@/lib/calculations";
-import { usePriceUpdater } from "@/hooks/use-price-updater";
 
 export default function DashboardPage() {
-  usePriceUpdater();
-  const portfolio = usePortfolioStore((s) => s.getActivePortfolio());
+  const portfolio = usePortfolioStore((s) =>
+    s.portfolios.find((p) => p.id === s.activePortfolioId)
+  );
   const activePortfolioId = usePortfolioStore((s) => s.activePortfolioId);
   const snapshots = usePortfolioStore((s) => s.snapshots[activePortfolioId] ?? []);
   const profile = usePortfolioStore((s) => s.profile);

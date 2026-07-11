@@ -6,25 +6,59 @@ import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
 import { Sidebar } from "./sidebar";
 import { useTheme } from "@/components/providers/theme-provider";
 import { useAuth } from "@/components/providers/auth-provider";
-import { usePriceUpdater } from "@/hooks/use-price-updater";
 import { usePortfolioStore } from "@/store/portfolio-store";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 
 export function Header() {
   const { theme, toggleTheme } = useTheme();
-  const { refresh } = usePriceUpdater();
   const { signOut } = useAuth();
-  const router = useRouter();
-  const portfolio = usePortfolioStore((s) => s.getActivePortfolio());
+  const portfolio = usePortfolioStore((s) =>
+    s.portfolios.find((p) => p.id === s.activePortfolioId)
+  );
   const profile = usePortfolioStore((s) => s.profile);
+
+  const handleRefreshPrices = async () => {
+    const { getActivePortfolio, updatePrices } = usePortfolioStore.getState();
+    const active = getActivePortfolio();
+    if (!active?.positions.length) return;
+    // Manueller Refresh – kein Hook nötig
+    try {
+      const cryptoIds = active.positions
+        .filter((p) => p.type === "CRYPTO" || p.type === "GOLD")
+        .map((p) => p.externalId ?? p.symbol.toLowerCase())
+        .filter(Boolean);
+      const stockSymbols = active.positions
+        .filter((p) => ["STOCK", "ETF"].includes(p.type))
+        .map((p) => p.symbol)
+        .filter(Boolean);
+      const updates: Record<string, { price: number; change24h?: number; changePercent24h?: number }> = {};
+      if (cryptoIds.length) {
+        const res = await fetch("/api/prices/crypto", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ ids: cryptoIds }),
+        });
+        if (res.ok) Object.assign(updates, await res.json());
+      }
+      if (stockSymbols.length) {
+        const res = await fetch("/api/prices/stocks", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ symbols: stockSymbols }),
+        });
+        if (res.ok) Object.assign(updates, await res.json());
+      }
+      if (Object.keys(updates).length) updatePrices(updates);
+    } catch {
+      // offline
+    }
+  };
 
   const handleLogout = async () => {
     await signOut();
     toast.success("Abgemeldet");
-    router.push("/login");
-    router.refresh();
+    window.location.assign("/login");
   };
 
   return (
@@ -56,7 +90,7 @@ export function Header() {
         </div>
       )}
 
-      <Button variant="ghost" size="icon" onClick={refresh} title="Preise aktualisieren">
+      <Button variant="ghost" size="icon" onClick={handleRefreshPrices} title="Preise aktualisieren">
         <RefreshCw className="h-4 w-4" />
       </Button>
       <Button variant="ghost" size="icon" onClick={toggleTheme} title="Theme wechseln">

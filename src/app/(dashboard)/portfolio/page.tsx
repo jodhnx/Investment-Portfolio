@@ -1,11 +1,8 @@
 "use client";
 
 import { PortfolioTable } from "@/components/portfolio/portfolio-table";
-import { usePriceUpdater } from "@/hooks/use-price-updater";
 
 export default function PortfolioPage() {
-  usePriceUpdater();
-
   return (
     <div className="space-y-6">
       <div>

@@ -58,18 +58,25 @@ export function Sidebar() {
         <label className="mb-1.5 block text-xs font-medium text-muted-foreground">
           Portfolio
         </label>
-        <Select value={activePortfolioId} onValueChange={(v) => v && setActivePortfolio(v)}>
-          <SelectTrigger className="w-full">
-            <SelectValue placeholder="Portfolio wählen" />
-          </SelectTrigger>
-          <SelectContent>
-            {portfolios.map((p) => (
-              <SelectItem key={p.id} value={p.id}>
-                {p.name}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
+        {portfolios.length > 0 ? (
+          <Select
+            value={activePortfolioId || undefined}
+            onValueChange={(v) => v && setActivePortfolio(v)}
+          >
+            <SelectTrigger className="w-full">
+              <SelectValue placeholder="Portfolio wählen" />
+            </SelectTrigger>
+            <SelectContent>
+              {portfolios.map((p) => (
+                <SelectItem key={p.id} value={p.id}>
+                  {p.name}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        ) : (
+          <p className="text-xs text-muted-foreground">Noch kein Portfolio vorhanden</p>
+        )}
         <Button
           variant="ghost"
           size="sm"

@@ -37,6 +37,8 @@ import { positionFromSearch } from "@/lib/storage";
 
 const MAX_HISTORY = 50;
 
+let hydrateInFlight: Promise<void> | null = null;
+
 const emptyState: AppState = {
   portfolios: [],
   activePortfolioId: "",
@@ -102,30 +104,40 @@ export const usePortfolioStore = create<PortfolioStore>()(
     profileId: null,
 
     hydrate: async () => {
-      try {
-        const data = await loadUserData();
-        if (!data) {
-          set({ ...emptyState, hydrated: true });
-          return;
+      if (hydrateInFlight) return hydrateInFlight;
+
+      hydrateInFlight = (async () => {
+        try {
+          const data = await loadUserData();
+          if (!data) {
+            set({ ...emptyState, hydrated: true, profile: null, profileId: null });
+            return;
+          }
+          set({
+            portfolios: data.portfolios,
+            activePortfolioId: data.portfolios[0]?.id ?? "",
+            snapshots: data.snapshots,
+            settings: data.settings,
+            profile: data.profile,
+            profileId: data.profile.id,
+            hydrated: true,
+            history: [],
+            historyIndex: -1,
+          });
+        } catch {
+          toast.error("Daten konnten nicht geladen werden.");
+          set({ hydrated: true });
         }
-        set({
-          portfolios: data.portfolios,
-          activePortfolioId: data.portfolios[0]?.id ?? "",
-          snapshots: data.snapshots,
-          settings: data.settings,
-          profile: data.profile,
-          profileId: data.profile.id,
-          hydrated: true,
-          history: [],
-          historyIndex: -1,
-        });
-      } catch {
-        toast.error("Daten konnten nicht geladen werden.");
-        set({ hydrated: true });
+      })();
+
+      try {
+        await hydrateInFlight;
+      } finally {
+        hydrateInFlight = null;
       }
     },
 
-    reset: () => set({ ...emptyState, hydrated: true, profile: null, profileId: null }),
+    reset: () => set({ ...emptyState, hydrated: false, profile: null, profileId: null }),
 
     pushHistory: () => {
       const { portfolios, activePortfolioId, snapshots, settings } = get();

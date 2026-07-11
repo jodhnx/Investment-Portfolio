@@ -44,7 +44,6 @@ const TIMEZONES = [
 
 export default function OnboardingPage() {
   const profile = usePortfolioStore((s) => s.profile);
-  const hydrate = usePortfolioStore((s) => s.hydrate);
   const [step, setStep] = useState(1);
   const [loading, setLoading] = useState(false);
   const [initLoading, setInitLoading] = useState(true);
@@ -57,25 +56,33 @@ export default function OnboardingPage() {
   });
 
   useEffect(() => {
+    let cancelled = false;
+
     async function init() {
       try {
         const supabase = createClient();
         const {
           data: { user },
         } = await supabase.auth.getUser();
-        if (user) {
+        if (user && !cancelled) {
           await syncProfileFromUser(supabase, user);
         }
-        await hydrate();
+        if (!cancelled) {
+          await usePortfolioStore.getState().hydrate();
+        }
       } catch (err) {
         logAuthError("onboarding:init", err);
-        toast.error("Profil konnte nicht geladen werden.");
+        if (!cancelled) toast.error("Profil konnte nicht geladen werden.");
       } finally {
-        setInitLoading(false);
+        if (!cancelled) setInitLoading(false);
       }
     }
+
     init();
-  }, [hydrate]);
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   useEffect(() => {
     if (profile) {
@@ -100,7 +107,7 @@ export default function OnboardingPage() {
     if (!user) return null;
 
     await syncProfileFromUser(supabase, user);
-    await hydrate();
+    await usePortfolioStore.getState().hydrate();
 
     return usePortfolioStore.getState().profile?.id ?? null;
   };
@@ -122,7 +129,7 @@ export default function OnboardingPage() {
         return;
       }
 
-      await hydrate();
+      await usePortfolioStore.getState().hydrate();
       toast.success(`Willkommen, ${form.name}!`);
       window.location.assign("/");
     } catch (err) {
