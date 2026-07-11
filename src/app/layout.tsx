@@ -1,4 +1,4 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import { Suspense } from "react";
 import { TooltipProvider } from "@/components/ui/tooltip";
@@ -19,9 +19,39 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "InvestTrack – Portfolio & Investment Rechner",
+  title: "InvestTrack – Portfolio & Investment Tracker",
   description:
-    "Persönliches Investment-Portfolio für Krypto, Aktien, ETFs und Gold",
+    "Professioneller Investment-Portfolio-Tracker für Krypto, Aktien, ETFs, Gold und individuelle Assets",
+  applicationName: "InvestTrack",
+  appleWebApp: {
+    capable: true,
+    statusBarStyle: "black-translucent",
+    title: "InvestTrack",
+  },
+  formatDetection: {
+    telephone: false,
+    email: false,
+    address: false,
+  },
+  other: {
+    "mobile-web-app-capable": "yes",
+  },
+  icons: {
+    icon: [{ url: "/icons/icon.svg", type: "image/svg+xml" }],
+    apple: [{ url: "/icons/icon.svg", type: "image/svg+xml" }],
+  },
+};
+
+export const viewport: Viewport = {
+  width: "device-width",
+  initialScale: 1,
+  maximumScale: 1,
+  userScalable: false,
+  viewportFit: "cover",
+  themeColor: [
+    { media: "(prefers-color-scheme: light)", color: "#ffffff" },
+    { media: "(prefers-color-scheme: dark)", color: "#0a0a0a" },
+  ],
 };
 
 export default function RootLayout({
@@ -35,7 +65,7 @@ export default function RootLayout({
       className={`${geistSans.variable} ${geistMono.variable} dark h-full antialiased`}
       suppressHydrationWarning
     >
-      <body className="min-h-full flex flex-col">
+      <body className="min-h-[100dvh] flex flex-col overscroll-none">
         <TooltipProvider>
           <AuthProvider>
             <StoreHydrator>

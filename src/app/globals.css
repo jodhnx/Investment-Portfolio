@@ -123,10 +123,12 @@
   }
   body {
     @apply bg-background text-foreground antialiased;
+    padding-top: env(safe-area-inset-top);
   }
   html {
     @apply font-sans;
     -webkit-tap-highlight-color: transparent;
+    touch-action: manipulation;
   }
 }
 

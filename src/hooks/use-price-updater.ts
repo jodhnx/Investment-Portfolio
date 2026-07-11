@@ -5,6 +5,8 @@ import { usePortfolioStore } from "@/store/portfolio-store";
 import { selectActivePortfolioId, selectPositionCount } from "@/lib/store-selectors";
 
 async function fetchAndApplyPrices(): Promise<void> {
+  if (typeof document !== "undefined" && document.visibilityState === "hidden") return;
+
   const { getActivePortfolio, updatePrices } = usePortfolioStore.getState();
   const portfolio = getActivePortfolio();
   if (!portfolio?.positions.length) return;
@@ -24,38 +26,50 @@ async function fetchAndApplyPrices(): Promise<void> {
     { price: number; change24h?: number; changePercent24h?: number }
   > = {};
 
+  const fetches: Promise<void>[] = [];
+
   if (cryptoIds.length) {
-    try {
-      const res = await fetch("/api/prices/crypto", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ ids: cryptoIds }),
-      });
-      if (res.ok) Object.assign(updates, await res.json());
-    } catch {
-      // offline
-    }
+    fetches.push(
+      (async () => {
+        try {
+          const res = await fetch("/api/prices/crypto", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ ids: cryptoIds }),
+          });
+          if (res.ok) Object.assign(updates, await res.json());
+        } catch {
+          // offline
+        }
+      })()
+    );
   }
 
   if (stockSymbols.length) {
-    try {
-      const res = await fetch("/api/prices/stocks", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ symbols: stockSymbols }),
-      });
-      if (res.ok) Object.assign(updates, await res.json());
-    } catch {
-      // offline
-    }
+    fetches.push(
+      (async () => {
+        try {
+          const res = await fetch("/api/prices/stocks", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ symbols: stockSymbols }),
+          });
+          if (res.ok) Object.assign(updates, await res.json());
+        } catch {
+          // offline
+        }
+      })()
+    );
   }
+
+  await Promise.all(fetches);
 
   if (Object.keys(updates).length) {
     updatePrices(updates);
   }
 }
 
-/** Preis-Updates – einmal pro Layout, stabile Effect-Dependencies */
+/** Preis-Updates – pausiert wenn Tab im Hintergrund */
 export function PriceUpdater() {
   const activePortfolioId = usePortfolioStore(selectActivePortfolioId);
   const positionCount = usePortfolioStore(selectPositionCount);
@@ -66,7 +80,16 @@ export function PriceUpdater() {
 
     void fetchAndApplyPrices();
     const timer = setInterval(() => void fetchAndApplyPrices(), interval);
-    return () => clearInterval(timer);
+
+    const onVisible = () => {
+      if (document.visibilityState === "visible") void fetchAndApplyPrices();
+    };
+    document.addEventListener("visibilitychange", onVisible);
+
+    return () => {
+      clearInterval(timer);
+      document.removeEventListener("visibilitychange", onVisible);
+    };
   }, [activePortfolioId, positionCount, interval]);
 
   return null;

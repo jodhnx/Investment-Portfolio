@@ -31,6 +31,7 @@ import { TopMovers } from "./top-movers";
 import { RecentTransactions } from "./recent-transactions";
 import { QuickActions } from "./quick-actions";
 import { MonthlyPerformance } from "./monthly-performance";
+import { WatchlistPreview } from "./watchlist-preview";
 import type { DashboardStats, Portfolio, PortfolioSnapshot } from "@/lib/types";
 import { cn } from "@/lib/utils";
 
@@ -42,6 +43,7 @@ export type WidgetId =
   | "losers"
   | "recent"
   | "monthly"
+  | "watchlist"
   | "quick";
 
 const WIDGET_META: Record<WidgetId, { label: string; default: boolean; span?: string }> = {
@@ -52,6 +54,7 @@ const WIDGET_META: Record<WidgetId, { label: string; default: boolean; span?: st
   losers: { label: "Top Verlierer", default: true },
   recent: { label: "Letzte Transaktionen", default: true, span: "lg:col-span-2" },
   monthly: { label: "Monatsperformance", default: true },
+  watchlist: { label: "Watchlist", default: true },
   quick: { label: "Schnellzugriff", default: true },
 };
 
@@ -63,6 +66,7 @@ const DEFAULT_ORDER: WidgetId[] = [
   "losers",
   "recent",
   "monthly",
+  "watchlist",
   "quick",
 ];
 
@@ -189,6 +193,8 @@ export function DashboardWidgets({ portfolio, stats, snapshots }: DashboardWidge
         return <RecentTransactions portfolio={portfolio} currency={portfolio.currency} />;
       case "monthly":
         return <MonthlyPerformance snapshots={snapshots} currency={portfolio.currency} />;
+      case "watchlist":
+        return <WatchlistPreview portfolio={portfolio} currency={portfolio.currency} />;
       case "quick":
         return <QuickActions />;
       default:

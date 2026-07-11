@@ -1,8 +1,8 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
-import { Search, Layers, ArrowLeftRight, Tag } from "lucide-react";
+import { Search, Layers, ArrowLeftRight, Tag, Building2, LayoutGrid } from "lucide-react";
 import {
   CommandDialog,
   CommandEmpty,
@@ -16,9 +16,21 @@ import { Button } from "@/components/ui/button";
 import { usePortfolioStore } from "@/store/portfolio-store";
 import { selectActivePortfolio } from "@/lib/store-selectors";
 import { MAIN_NAV } from "@/config/navigation";
+import { getAssetMeta } from "@/lib/asset-meta";
+
+const TX_LABELS: Record<string, string> = {
+  BUY: "Kauf",
+  SELL: "Verkauf",
+  DEPOSIT: "Einzahlung",
+  WITHDRAWAL: "Auszahlung",
+  DIVIDEND: "Dividende",
+  FEE: "Gebühr",
+  TAX: "Steuer",
+};
 
 export function GlobalSearch() {
   const [open, setOpen] = useState(false);
+  const [query, setQuery] = useState("");
   const router = useRouter();
   const portfolio = usePortfolioStore(selectActivePortfolio);
 
@@ -36,15 +48,77 @@ export function GlobalSearch() {
   const go = useCallback(
     (path: string) => {
       setOpen(false);
+      setQuery("");
       router.push(path);
     },
     [router]
   );
 
-  const positions = portfolio?.positions.filter((p) => !p.isWatchlist) ?? [];
-  const allTransactions = positions.flatMap((p) =>
-    p.transactions.map((t) => ({ ...t, assetName: p.name, assetId: p.id }))
+  const q = query.trim().toLowerCase();
+
+  const filteredNav = useMemo(
+    () => MAIN_NAV.filter((item) => !q || item.label.toLowerCase().includes(q)),
+    [q]
   );
+
+  const positions = useMemo(
+    () => portfolio?.positions.filter((p) => !p.isWatchlist) ?? [],
+    [portfolio?.positions]
+  );
+
+  const filteredAssets = useMemo(() => {
+    if (!q) return positions.slice(0, 15);
+    return positions
+      .filter(
+        (p) =>
+          p.name.toLowerCase().includes(q) ||
+          p.symbol.toLowerCase().includes(q) ||
+          getAssetMeta(p.notes).customCategory?.toLowerCase().includes(q)
+      )
+      .slice(0, 15);
+  }, [positions, q]);
+
+  const filteredTransactions = useMemo(() => {
+    const all = positions.flatMap((p) =>
+      p.transactions.map((t) => ({
+        ...t,
+        assetName: p.name,
+        symbol: p.symbol,
+      }))
+    );
+    if (!q) return all.slice(0, 15);
+    return all
+      .filter(
+        (t) =>
+          t.assetName.toLowerCase().includes(q) ||
+          t.symbol.toLowerCase().includes(q) ||
+          (TX_LABELS[t.type] ?? t.type).toLowerCase().includes(q)
+      )
+      .slice(0, 15);
+  }, [positions, q]);
+
+  const filteredCategories = useMemo(() => {
+    const cats = portfolio?.categories ?? [];
+    if (!q) return cats;
+    return cats.filter((c) => c.name.toLowerCase().includes(q));
+  }, [portfolio?.categories, q]);
+
+  const filteredBrokers = useMemo(() => {
+    const brokers = new Set<string>();
+    for (const p of positions) {
+      if (p.broker?.trim()) brokers.add(p.broker.trim());
+    }
+    const list = Array.from(brokers);
+    if (!q) return list.slice(0, 10);
+    return list.filter((b) => b.toLowerCase().includes(q)).slice(0, 10);
+  }, [positions, q]);
+
+  const hasResults =
+    filteredNav.length > 0 ||
+    filteredAssets.length > 0 ||
+    filteredTransactions.length > 0 ||
+    filteredCategories.length > 0 ||
+    filteredBrokers.length > 0;
 
   return (
     <>
@@ -70,24 +144,38 @@ export function GlobalSearch() {
         <Search className="h-4 w-4" />
       </Button>
 
-      <CommandDialog open={open} onOpenChange={setOpen} title="Globale Suche">
-        <CommandInput placeholder="Assets, Transaktionen, Seiten…" />
+      <CommandDialog
+        open={open}
+        onOpenChange={(v) => {
+          setOpen(v);
+          if (!v) setQuery("");
+        }}
+        title="Globale Suche"
+        description="Assets, Transaktionen, Broker und Seiten durchsuchen"
+      >
+        <CommandInput
+          placeholder="Assets, Transaktionen, Broker…"
+          value={query}
+          onValueChange={setQuery}
+        />
         <CommandList>
-          <CommandEmpty>Keine Ergebnisse.</CommandEmpty>
-          <CommandGroup heading="Seiten">
-            {MAIN_NAV.map((item) => (
-              <CommandItem key={item.href} onSelect={() => go(item.href)}>
-                <item.icon className="mr-2 h-4 w-4" />
-                {item.label}
-              </CommandItem>
-            ))}
-          </CommandGroup>
-          {positions.length > 0 && (
+          {!hasResults && <CommandEmpty>Keine Ergebnisse.</CommandEmpty>}
+          {filteredNav.length > 0 && (
+            <CommandGroup heading="Seiten">
+              {filteredNav.map((item) => (
+                <CommandItem key={item.href} value={`page-${item.href}`} onSelect={() => go(item.href)}>
+                  <item.icon className="mr-2 h-4 w-4" />
+                  {item.label}
+                </CommandItem>
+              ))}
+            </CommandGroup>
+          )}
+          {filteredAssets.length > 0 && (
             <>
               <CommandSeparator />
               <CommandGroup heading="Assets">
-                {positions.map((p) => (
-                  <CommandItem key={p.id} onSelect={() => go("/assets")}>
+                {filteredAssets.map((p) => (
+                  <CommandItem key={p.id} value={`asset-${p.id}`} onSelect={() => go("/assets")}>
                     <Layers className="mr-2 h-4 w-4" />
                     <span>{p.name}</span>
                     <span className="ml-auto text-xs text-muted-foreground">{p.symbol}</span>
@@ -96,25 +184,60 @@ export function GlobalSearch() {
               </CommandGroup>
             </>
           )}
-          {allTransactions.length > 0 && (
+          {filteredTransactions.length > 0 && (
             <>
               <CommandSeparator />
               <CommandGroup heading="Transaktionen">
-                {allTransactions.slice(0, 20).map((t) => (
-                  <CommandItem key={t.id} onSelect={() => go("/transactions")}>
+                {filteredTransactions.map((t) => (
+                  <CommandItem key={t.id} value={`tx-${t.id}`} onSelect={() => go("/transactions")}>
                     <ArrowLeftRight className="mr-2 h-4 w-4" />
-                    {t.type} · {t.assetName}
+                    {TX_LABELS[t.type] ?? t.type} · {t.assetName}
                   </CommandItem>
                 ))}
               </CommandGroup>
             </>
           )}
-          {portfolio?.categories.map((c) => (
-            <CommandItem key={c.id} onSelect={() => go("/assets")}>
-              <Tag className="mr-2 h-4 w-4" />
-              Kategorie: {c.name}
-            </CommandItem>
-          ))}
+          {filteredCategories.length > 0 && (
+            <>
+              <CommandSeparator />
+              <CommandGroup heading="Kategorien">
+                {filteredCategories.map((c) => (
+                  <CommandItem key={c.id} value={`cat-${c.id}`} onSelect={() => go("/assets")}>
+                    <Tag className="mr-2 h-4 w-4" />
+                    {c.name}
+                  </CommandItem>
+                ))}
+              </CommandGroup>
+            </>
+          )}
+          {filteredBrokers.length > 0 && (
+            <>
+              <CommandSeparator />
+              <CommandGroup heading="Broker">
+                {filteredBrokers.map((b) => (
+                  <CommandItem key={b} value={`broker-${b}`} onSelect={() => go("/assets")}>
+                    <Building2 className="mr-2 h-4 w-4" />
+                    {b}
+                  </CommandItem>
+                ))}
+              </CommandGroup>
+            </>
+          )}
+          {!q && (
+            <>
+              <CommandSeparator />
+              <CommandGroup heading="Schnellzugriff">
+                <CommandItem value="quick-dashboard" onSelect={() => go("/")}>
+                  <LayoutGrid className="mr-2 h-4 w-4" />
+                  Dashboard
+                </CommandItem>
+                <CommandItem value="quick-performance" onSelect={() => go("/performance")}>
+                  <LayoutGrid className="mr-2 h-4 w-4" />
+                  Performance
+                </CommandItem>
+              </CommandGroup>
+            </>
+          )}
         </CommandList>
       </CommandDialog>
     </>

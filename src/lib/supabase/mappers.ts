@@ -1,3 +1,5 @@
+import { prepareTransactionForDatabase } from "@/lib/transaction-db";
+import type { Database } from "@/lib/supabase/database.types";
 import type {
   AssetType,
   Currency,
@@ -8,7 +10,6 @@ import type {
   Dividend,
   PriceAlert,
 } from "@/lib/types";
-import type { Database } from "@/lib/supabase/database.types";
 
 type AssetRow = Database["public"]["Tables"]["assets"]["Row"];
 type TransactionRow = Database["public"]["Tables"]["transactions"]["Row"];
@@ -168,22 +169,16 @@ export function transactionToInsert(
   tx: Transaction,
   assetId: string
 ): Database["public"]["Tables"]["transactions"]["Insert"] {
-  const dbType = tx.type === "SELL" || tx.type === "WITHDRAWAL" ? "SELL" : "BUY";
+  const { dbType, quantity, price, fees, taxes, notes } = prepareTransactionForDatabase(tx);
   return {
     id: tx.id,
     asset_id: assetId,
     transaction_type: dbType,
-    quantity: tx.quantity,
-    price: tx.price,
-    fees: tx.fees,
-    taxes: 0,
+    quantity,
+    price,
+    fees,
+    taxes,
     date: tx.date,
-    notes:
-      tx.type === "BUY" || tx.type === "SELL"
-        ? tx.notes ?? null
-        : JSON.stringify({
-            extendedType: tx.type,
-            ...(tx.notes ? { note: tx.notes } : {}),
-          }),
+    notes,
   };
 }

@@ -45,7 +45,7 @@ const emptyState: AppState = {
   portfolios: [],
   activePortfolioId: "",
   snapshots: {},
-  settings: { theme: "dark", defaultCurrency: "EUR", priceRefreshInterval: 60000 },
+  settings: { theme: "dark", defaultCurrency: "EUR", priceRefreshInterval: 120000 },
   history: [],
   historyIndex: -1,
 };

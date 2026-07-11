@@ -8,12 +8,18 @@ import {
   selectSnapshotsForActivePortfolio,
 } from "@/lib/store-selectors";
 import { DashboardWidgets } from "@/components/dashboard/dashboard-widgets";
+import { DashboardSkeleton } from "@/components/dashboard/dashboard-skeleton";
 import { computePortfolioStats } from "@/lib/calculations";
 
 export default function DashboardPage() {
+  const hydrated = usePortfolioStore((s) => s.hydrated);
   const portfolio = usePortfolioStore(selectActivePortfolio);
   const snapshots = usePortfolioStore(selectSnapshotsForActivePortfolio);
   const profile = usePortfolioStore(selectProfile);
+
+  if (!hydrated) {
+    return <DashboardSkeleton />;
+  }
 
   if (!portfolio) {
     return (
