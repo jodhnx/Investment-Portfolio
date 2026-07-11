@@ -7,7 +7,17 @@ export type AssetType =
   | "COMMODITY"
   | "OTHER";
 
-export type TransactionType = "BUY" | "SELL";
+export type TransactionType =
+  | "BUY"
+  | "SELL"
+  | "DEPOSIT"
+  | "WITHDRAWAL"
+  | "DIVIDEND"
+  | "FEE"
+  | "TAX"
+  | "SPLIT"
+  | "BONUS"
+  | "CUSTOM";
 
 export type Currency = "EUR" | "USD" | "CHF";
 
@@ -104,6 +114,10 @@ export interface ComputedPosition {
   profitLossPercent: number;
   fees: number;
   avgBuyPrice: number;
+  roi: number;
+  breakEven: number;
+  netProfit: number;
+  taxes: number;
   priceChange24h?: number;
   priceChangePercent24h?: number;
   isWatchlist: boolean;
@@ -116,8 +130,14 @@ export interface DashboardStats {
   profitLossPercent: number;
   dayChange: number;
   dayChangePercent: number;
+  dayGain: number;
+  dayLoss: number;
   realMoneyProfit: number;
   positionCount: number;
+  transactionCount: number;
+  totalFees: number;
+  totalTaxes: number;
+  netProfit: number;
   bestInvestment: { name: string; profitPercent: number } | null;
   worstInvestment: { name: string; profitPercent: number } | null;
 }

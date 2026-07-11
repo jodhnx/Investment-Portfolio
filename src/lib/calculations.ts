@@ -13,6 +13,7 @@ export function computeTransactionStats(transactions: Transaction[]) {
   let totalQuantity = 0;
   let totalCost = 0;
   let totalFees = 0;
+  let totalTaxes = 0;
   let realizedProfit = 0;
   let avgBuyPrice = 0;
 
@@ -21,19 +22,19 @@ export function computeTransactionStats(transactions: Transaction[]) {
   );
 
   for (const tx of sorted) {
-    if (tx.type === "BUY") {
+    totalFees += tx.fees;
+    if (tx.type === "TAX") totalTaxes += tx.price * tx.quantity || tx.price;
+    if (tx.type === "BUY" || tx.type === "DEPOSIT" || tx.type === "BONUS") {
       totalCost += tx.quantity * tx.price;
       totalQuantity += tx.quantity;
-      totalFees += tx.fees;
       avgBuyPrice = totalQuantity > 0 ? totalCost / totalQuantity : 0;
-    } else {
+    } else if (tx.type === "SELL" || tx.type === "WITHDRAWAL") {
       const sellQty = Math.min(tx.quantity, totalQuantity);
       const costBasis = sellQty * avgBuyPrice;
       const proceeds = sellQty * tx.price - tx.fees;
       realizedProfit += proceeds - costBasis;
       totalQuantity -= sellQty;
       totalCost = totalQuantity * avgBuyPrice;
-      totalFees += tx.fees;
     }
   }
 
@@ -42,8 +43,9 @@ export function computeTransactionStats(transactions: Transaction[]) {
     avgBuyPrice,
     invested: totalCost,
     totalFees,
+    totalTaxes,
     realizedProfit,
-    firstPurchaseDate: sorted.find((t) => t.type === "BUY")?.date,
+    firstPurchaseDate: sorted.find((t) => t.type === "BUY" || t.type === "DEPOSIT")?.date,
   };
 }
 
@@ -57,6 +59,13 @@ export function computePosition(position: Position): ComputedPosition {
     stats.invested > 0
       ? ((currentValue - stats.invested) / stats.invested) * 100
       : 0;
+  const breakEven =
+    stats.quantity > 0
+      ? stats.avgBuyPrice + (stats.totalFees + stats.totalTaxes) / stats.quantity
+      : 0;
+  const netProfit = profitLoss - stats.totalFees - stats.totalTaxes;
+  const roi =
+    stats.invested > 0 ? (netProfit / stats.invested) * 100 : 0;
 
   return {
     id: position.id,
@@ -78,6 +87,10 @@ export function computePosition(position: Position): ComputedPosition {
     profitLossPercent,
     fees: stats.totalFees,
     avgBuyPrice: stats.avgBuyPrice,
+    roi,
+    breakEven,
+    netProfit,
+    taxes: stats.totalTaxes,
     priceChange24h: position.priceChange24h,
     priceChangePercent24h: position.priceChangePercent24h,
     isWatchlist: position.isWatchlist,
@@ -104,6 +117,16 @@ export function computePortfolioStats(
   }, 0);
   const dayChangePercent =
     totalValue > 0 ? (dayChange / (totalValue - dayChange)) * 100 : 0;
+  const dayGain = dayChange > 0 ? dayChange : 0;
+  const dayLoss = dayChange < 0 ? Math.abs(dayChange) : 0;
+
+  const transactionCount = portfolio.positions
+    .filter((p) => !p.isWatchlist)
+    .reduce((s, p) => s + p.transactions.length, 0);
+
+  const totalFees = positions.reduce((s, p) => s + p.fees, 0);
+  const totalTaxes = positions.reduce((s, p) => s + p.taxes, 0);
+  const netProfit = profitLoss - totalFees - totalTaxes;
 
   const realMoneyProfit = positions.reduce((s, p) => {
     const stats = computeTransactionStats(
@@ -123,8 +146,14 @@ export function computePortfolioStats(
     profitLossPercent,
     dayChange,
     dayChangePercent,
+    dayGain,
+    dayLoss,
     realMoneyProfit,
     positionCount: positions.length,
+    transactionCount,
+    totalFees,
+    totalTaxes,
+    netProfit,
     bestInvestment: ranked[0]
       ? { name: ranked[0].name, profitPercent: ranked[0].profitLossPercent }
       : null,

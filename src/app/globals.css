@@ -122,9 +122,20 @@
     @apply border-border outline-ring/50;
   }
   body {
-    @apply bg-background text-foreground;
+    @apply bg-background text-foreground antialiased;
   }
   html {
     @apply font-sans;
+    -webkit-tap-highlight-color: transparent;
+  }
+}
+
+@layer utilities {
+  .premium-gradient {
+    background: linear-gradient(
+      135deg,
+      oklch(from var(--background) l c h),
+      oklch(from var(--muted) l c h / 0.4)
+    );
   }
 }

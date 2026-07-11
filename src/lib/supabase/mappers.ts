@@ -19,14 +19,27 @@ type SnapshotRow = Database["public"]["Tables"]["portfolio_snapshots"]["Row"];
 type AlertRow = Database["public"]["Tables"]["price_alerts"]["Row"];
 
 export function mapTransaction(row: TransactionRow): Transaction {
+  let type = row.transaction_type as Transaction["type"];
+  let notes = row.notes ?? undefined;
+  if (notes) {
+    try {
+      const parsed = JSON.parse(notes) as { extendedType?: Transaction["type"]; note?: string };
+      if (parsed.extendedType) {
+        type = parsed.extendedType;
+        notes = parsed.note;
+      }
+    } catch {
+      // plain notes
+    }
+  }
   return {
     id: row.id,
-    type: row.transaction_type as Transaction["type"],
+    type,
     quantity: Number(row.quantity),
     price: Number(row.price),
     fees: Number(row.fees),
     date: row.date,
-    notes: row.notes ?? undefined,
+    notes,
   };
 }
 
@@ -155,15 +168,22 @@ export function transactionToInsert(
   tx: Transaction,
   assetId: string
 ): Database["public"]["Tables"]["transactions"]["Insert"] {
+  const dbType = tx.type === "SELL" || tx.type === "WITHDRAWAL" ? "SELL" : "BUY";
   return {
     id: tx.id,
     asset_id: assetId,
-    transaction_type: tx.type,
+    transaction_type: dbType,
     quantity: tx.quantity,
     price: tx.price,
     fees: tx.fees,
     taxes: 0,
     date: tx.date,
-    notes: tx.notes ?? null,
+    notes:
+      tx.type === "BUY" || tx.type === "SELL"
+        ? tx.notes ?? null
+        : JSON.stringify({
+            extendedType: tx.type,
+            ...(tx.notes ? { note: tx.notes } : {}),
+          }),
   };
 }
