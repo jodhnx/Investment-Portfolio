@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { useRouter } from "next/navigation";
 import { v4 as uuidv4 } from "uuid";
 import { Plus } from "lucide-react";
 import {
@@ -39,26 +40,22 @@ interface CustomAssetDialogProps {
 }
 
 export function CustomAssetDialog({ open: controlledOpen, onOpenChange, hideTrigger }: CustomAssetDialogProps) {
+  const router = useRouter();
   const [internalOpen, setInternalOpen] = useState(false);
   const open = controlledOpen ?? internalOpen;
   const setOpen = onOpenChange ?? setInternalOpen;
   const portfolio = usePortfolioStore(selectActivePortfolio);
   const addPosition = usePortfolioStore((s) => s.addPosition);
-  const addTransaction = usePortfolioStore((s) => s.addTransaction);
   const addCategory = usePortfolioStore((s) => s.addCategory);
 
   const [name, setName] = useState("");
   const [symbol, setSymbol] = useState("");
   const [category, setCategory] = useState("");
-  const [subcategory, setSubcategory] = useState("");
   const [currency, setCurrency] = useState<Currency>("EUR");
-  const [buyPrice, setBuyPrice] = useState("");
-  const [currentPrice, setCurrentPrice] = useState("");
-  const [quantity, setQuantity] = useState("");
-  const [purchaseDate, setPurchaseDate] = useState(new Date().toISOString().split("T")[0]);
   const [broker, setBroker] = useState("");
-  const [fees, setFees] = useState("0");
-  const [taxes, setTaxes] = useState("0");
+  const [isin, setIsin] = useState("");
+  const [wkn, setWkn] = useState("");
+  const [currentPrice, setCurrentPrice] = useState("");
   const [notes, setNotes] = useState("");
   const [color, setColor] = useState(COLORS[0]);
   const [icon, setIcon] = useState("");
@@ -68,13 +65,10 @@ export function CustomAssetDialog({ open: controlledOpen, onOpenChange, hideTrig
     setName("");
     setSymbol("");
     setCategory("");
-    setSubcategory("");
-    setBuyPrice("");
-    setCurrentPrice("");
-    setQuantity("");
     setBroker("");
-    setFees("0");
-    setTaxes("0");
+    setIsin("");
+    setWkn("");
+    setCurrentPrice("");
     setNotes("");
     setIcon("");
     setImageUrl("");
@@ -108,10 +102,11 @@ export function CustomAssetDialog({ open: controlledOpen, onOpenChange, hideTrig
     const notesPayload = serializePositionNotes(
       {
         customCategory: category.trim() || undefined,
-        subcategory: subcategory.trim() || undefined,
         icon: icon.trim() || undefined,
         imageUrl: imageUrl.trim() || undefined,
         currency,
+        isin: isin.trim() || undefined,
+        wkn: wkn.trim() || undefined,
       },
       notes
     );
@@ -126,7 +121,7 @@ export function CustomAssetDialog({ open: controlledOpen, onOpenChange, hideTrig
       notes: notesPayload,
       color,
       categoryId,
-      currentPrice: currentPrice ? parseFloat(currentPrice) : buyPrice ? parseFloat(buyPrice) : undefined,
+      currentPrice: currentPrice ? parseFloat(currentPrice) : undefined,
       transactions: [],
       dividends: [],
       priceAlerts: [],
@@ -135,20 +130,10 @@ export function CustomAssetDialog({ open: controlledOpen, onOpenChange, hideTrig
       updatedAt: now,
     });
 
-    if (quantity && buyPrice) {
-      addTransaction(positionId, {
-        type: "BUY",
-        quantity: parseFloat(quantity),
-        price: parseFloat(buyPrice),
-        fees: parseFloat(fees) || 0,
-        date: new Date(purchaseDate).toISOString(),
-        notes: taxes && parseFloat(taxes) > 0 ? JSON.stringify({ taxes: parseFloat(taxes) }) : undefined,
-      });
-    }
-
     toast.success(`${name} wurde angelegt`);
     reset();
     setOpen(false);
+    router.push(`/assets/${positionId}`);
   };
 
   return (
@@ -182,7 +167,7 @@ export function CustomAssetDialog({ open: controlledOpen, onOpenChange, hideTrig
               <Input
                 value={category}
                 onChange={(e) => setCategory(e.target.value)}
-                placeholder="Crypto, Immobilien…"
+                placeholder="Crypto, Aktien…"
                 list="category-suggestions"
                 className="h-11"
               />
@@ -193,15 +178,8 @@ export function CustomAssetDialog({ open: controlledOpen, onOpenChange, hideTrig
               </datalist>
             </div>
             <div className="space-y-2">
-              <Label>Unterkategorie</Label>
-              <Input value={subcategory} onChange={(e) => setSubcategory(e.target.value)} className="h-11" />
-            </div>
-          </div>
-
-          <div className="grid gap-3 sm:grid-cols-2">
-            <div className="space-y-2">
               <Label>Währung</Label>
-              <Select value={currency} onValueChange={(v) => setCurrency(v as Currency)}>
+              <Select value={currency} onValueChange={(v) => v && setCurrency(v as Currency)}>
                 <SelectTrigger className="h-11">
                   <SelectValue />
                 </SelectTrigger>
@@ -212,42 +190,27 @@ export function CustomAssetDialog({ open: controlledOpen, onOpenChange, hideTrig
                 </SelectContent>
               </Select>
             </div>
-            <div className="space-y-2">
-              <Label>Broker</Label>
-              <Input value={broker} onChange={(e) => setBroker(e.target.value)} className="h-11" />
-            </div>
           </div>
 
           <div className="grid gap-3 sm:grid-cols-2">
             <div className="space-y-2">
-              <Label>Kaufkurs</Label>
-              <Input type="number" step="any" value={buyPrice} onChange={(e) => setBuyPrice(e.target.value)} className="h-11" />
+              <Label>Broker</Label>
+              <Input value={broker} onChange={(e) => setBroker(e.target.value)} className="h-11" />
             </div>
             <div className="space-y-2">
-              <Label>Aktueller Kurs</Label>
+              <Label>Aktueller Kurs (optional)</Label>
               <Input type="number" step="any" value={currentPrice} onChange={(e) => setCurrentPrice(e.target.value)} className="h-11" />
             </div>
           </div>
 
           <div className="grid gap-3 sm:grid-cols-2">
             <div className="space-y-2">
-              <Label>Anzahl</Label>
-              <Input type="number" step="any" value={quantity} onChange={(e) => setQuantity(e.target.value)} className="h-11" />
+              <Label>ISIN (optional)</Label>
+              <Input value={isin} onChange={(e) => setIsin(e.target.value)} className="h-11" />
             </div>
             <div className="space-y-2">
-              <Label>Kaufdatum</Label>
-              <Input type="date" value={purchaseDate} onChange={(e) => setPurchaseDate(e.target.value)} className="h-11" />
-            </div>
-          </div>
-
-          <div className="grid gap-3 sm:grid-cols-2">
-            <div className="space-y-2">
-              <Label>Gebühren</Label>
-              <Input type="number" step="any" value={fees} onChange={(e) => setFees(e.target.value)} className="h-11" />
-            </div>
-            <div className="space-y-2">
-              <Label>Steuern</Label>
-              <Input type="number" step="any" value={taxes} onChange={(e) => setTaxes(e.target.value)} className="h-11" />
+              <Label>WKN (optional)</Label>
+              <Input value={wkn} onChange={(e) => setWkn(e.target.value)} className="h-11" />
             </div>
           </div>
 

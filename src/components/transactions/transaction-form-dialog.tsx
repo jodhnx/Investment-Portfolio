@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import {
   Dialog,
   DialogContent,
@@ -59,6 +59,10 @@ export function TransactionFormDialog({
   const [fees, setFees] = useState("0");
   const [date, setDate] = useState(new Date().toISOString().split("T")[0]);
   const [saving, setSaving] = useState(false);
+
+  useEffect(() => {
+    if (open && defaultPositionId) setPositionId(defaultPositionId);
+  }, [open, defaultPositionId]);
 
   const resetForm = () => {
     setQuantity("");

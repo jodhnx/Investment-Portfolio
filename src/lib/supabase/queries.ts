@@ -63,6 +63,7 @@ export async function loadUserData(): Promise<LoadedUserData | null> {
     { data: watchlist },
     { data: alerts },
     { data: snapshots },
+    cashFlowsResult,
   ] = await Promise.all([
     supabase.from("portfolios").select("*").eq("profile_id", profileRow.id).order("created_at"),
     supabase.from("assets").select("*"),
@@ -71,7 +72,10 @@ export async function loadUserData(): Promise<LoadedUserData | null> {
     supabase.from("watchlist").select("*").eq("profile_id", profileRow.id),
     supabase.from("price_alerts").select("*").eq("profile_id", profileRow.id),
     supabase.from("portfolio_snapshots").select("*").order("date"),
+    supabase.from("cash_flows").select("*").order("date"),
   ]);
+
+  const cashFlowRows = cashFlowsResult.data ?? [];
 
   const portfolioRows = portfolios ?? [];
   const assetRows = assets ?? [];
@@ -89,7 +93,17 @@ export async function loadUserData(): Promise<LoadedUserData | null> {
         alertRows
       )
     );
-    return mapPortfolio(p, positions);
+    const flows = cashFlowRows
+      .filter((c) => c.portfolio_id === p.id)
+      .map((c) => ({
+        id: c.id,
+        type: c.flow_type as "DEPOSIT" | "WITHDRAWAL",
+        amount: Number(c.amount),
+        date: c.date,
+        category: c.category ?? undefined,
+        notes: c.notes ?? undefined,
+      }));
+    return mapPortfolio(p, positions, flows);
   });
 
   // Watchlist als virtuelles Portfolio anhängen

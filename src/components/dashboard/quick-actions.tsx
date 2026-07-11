@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import Link from "next/link";
-import { Plus, Layers, ArrowLeftRight, Calculator, Eye, Settings } from "lucide-react";
+import { Plus, Layers, ArrowLeftRight, Calculator, Eye, Settings, Landmark } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { CustomAssetDialog } from "@/components/assets/custom-asset-dialog";
@@ -11,6 +11,7 @@ const links = [
   { href: "/assets", label: "Assets", icon: Layers },
   { href: "/transactions", label: "Transaktion", icon: ArrowLeftRight },
   { href: "/watchlist", label: "Watchlist", icon: Eye },
+  { href: "/capital", label: "Kapital", icon: Landmark },
   { href: "/calculators", label: "Rechner", icon: Calculator },
   { href: "/settings", label: "Einstellungen", icon: Settings },
 ];

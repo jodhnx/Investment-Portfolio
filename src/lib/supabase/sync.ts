@@ -109,6 +109,31 @@ export async function syncTransactionInsert(
   return { error: error?.message ?? null };
 }
 
+export async function syncTransactionUpdate(
+  tx: Transaction,
+  assetId: string
+): Promise<SyncResult> {
+  const row = transactionToInsert(tx, assetId);
+  const { error } = await getSupabase()
+    .from("transactions")
+    .update({
+      transaction_type: row.transaction_type,
+      quantity: row.quantity,
+      price: row.price,
+      fees: row.fees,
+      taxes: row.taxes,
+      date: row.date,
+      notes: row.notes,
+    })
+    .eq("id", tx.id);
+  return { error: error?.message ?? null };
+}
+
+export async function syncTransactionDelete(id: string): Promise<SyncResult> {
+  const { error } = await getSupabase().from("transactions").delete().eq("id", id);
+  return { error: error?.message ?? null };
+}
+
 export async function syncDividendInsert(
   div: Dividend,
   assetId: string
@@ -120,6 +145,48 @@ export async function syncDividendInsert(
     date: div.date,
     notes: div.notes ?? null,
   });
+  return { error: error?.message ?? null };
+}
+
+export async function syncDividendDelete(id: string): Promise<SyncResult> {
+  const { error } = await getSupabase().from("dividends").delete().eq("id", id);
+  return { error: error?.message ?? null };
+}
+
+export async function syncCashFlowInsert(
+  flow: import("@/lib/types").CashFlow,
+  portfolioId: string
+): Promise<SyncResult> {
+  const { error } = await getSupabase().from("cash_flows").insert({
+    id: flow.id,
+    portfolio_id: portfolioId,
+    flow_type: flow.type,
+    amount: flow.amount,
+    date: flow.date,
+    category: flow.category ?? null,
+    notes: flow.notes ?? null,
+  });
+  return { error: error?.message ?? null };
+}
+
+export async function syncCashFlowUpdate(
+  flow: import("@/lib/types").CashFlow
+): Promise<SyncResult> {
+  const { error } = await getSupabase()
+    .from("cash_flows")
+    .update({
+      flow_type: flow.type,
+      amount: flow.amount,
+      date: flow.date,
+      category: flow.category ?? null,
+      notes: flow.notes ?? null,
+    })
+    .eq("id", flow.id);
+  return { error: error?.message ?? null };
+}
+
+export async function syncCashFlowDelete(id: string): Promise<SyncResult> {
+  const { error } = await getSupabase().from("cash_flows").delete().eq("id", id);
   return { error: error?.message ?? null };
 }
 

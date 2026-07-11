@@ -29,7 +29,17 @@ export interface Transaction {
   quantity: number;
   price: number;
   fees: number;
+  taxes?: number;
   date: string;
+  notes?: string;
+}
+
+export interface CashFlow {
+  id: string;
+  type: "DEPOSIT" | "WITHDRAWAL";
+  amount: number;
+  date: string;
+  category?: string;
   notes?: string;
 }
 
@@ -83,6 +93,7 @@ export interface Portfolio {
   color?: string;
   positions: Position[];
   categories: Category[];
+  cashFlows?: CashFlow[];
   createdAt: string;
   updatedAt: string;
 }
@@ -138,6 +149,12 @@ export interface DashboardStats {
   totalFees: number;
   totalTaxes: number;
   netProfit: number;
+  freeCapital: number;
+  investedCapital: number;
+  totalDeposits: number;
+  totalWithdrawals: number;
+  realizedProfit: number;
+  unrealizedProfit: number;
   bestInvestment: { name: string; profitPercent: number } | null;
   worstInvestment: { name: string; profitPercent: number } | null;
 }

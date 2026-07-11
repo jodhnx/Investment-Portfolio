@@ -1,3 +1,5 @@
+import { computeCashFlowStats } from "./cash-flow-calculations";
+import { computeAssetDetailSummary } from "./asset-calculations";
 import type {
   ComputedPosition,
   DashboardStats,
@@ -139,8 +141,18 @@ export function computePortfolioStats(
     .filter((p) => p.invested > 0)
     .sort((a, b) => b.profitLossPercent - a.profitLossPercent);
 
+  let realizedProfit = 0;
+  let unrealizedProfit = 0;
+  for (const pos of portfolio.positions.filter((p) => !p.isWatchlist)) {
+    const detail = computeAssetDetailSummary(pos);
+    realizedProfit += detail.realizedProfit;
+    unrealizedProfit += detail.unrealizedProfit;
+  }
+
+  const cashStats = computeCashFlowStats(portfolio);
+
   return {
-    totalValue,
+    totalValue: cashStats.totalPortfolio,
     totalInvested,
     profitLoss,
     profitLossPercent,
@@ -154,6 +166,12 @@ export function computePortfolioStats(
     totalFees,
     totalTaxes,
     netProfit,
+    freeCapital: cashStats.availableCapital,
+    investedCapital: cashStats.investedCapital,
+    totalDeposits: cashStats.totalDeposits,
+    totalWithdrawals: cashStats.totalWithdrawals,
+    realizedProfit,
+    unrealizedProfit,
     bestInvestment: ranked[0]
       ? { name: ranked[0].name, profitPercent: ranked[0].profitLossPercent }
       : null,

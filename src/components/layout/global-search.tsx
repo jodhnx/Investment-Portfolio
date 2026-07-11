@@ -175,7 +175,7 @@ export function GlobalSearch() {
               <CommandSeparator />
               <CommandGroup heading="Assets">
                 {filteredAssets.map((p) => (
-                  <CommandItem key={p.id} value={`asset-${p.id}`} onSelect={() => go("/assets")}>
+                  <CommandItem key={p.id} value={`asset-${p.id}`} onSelect={() => go(`/assets/${p.id}`)}>
                     <Layers className="mr-2 h-4 w-4" />
                     <span>{p.name}</span>
                     <span className="ml-auto text-xs text-muted-foreground">{p.symbol}</span>

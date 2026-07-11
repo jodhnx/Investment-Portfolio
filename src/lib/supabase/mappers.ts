@@ -39,6 +39,7 @@ export function mapTransaction(row: TransactionRow): Transaction {
     quantity: Number(row.quantity),
     price: Number(row.price),
     fees: Number(row.fees),
+    taxes: Number(row.taxes) || undefined,
     date: row.date,
     notes,
   };
@@ -121,7 +122,8 @@ export function mapWatchlistToPosition(row: WatchlistRow, alerts: AlertRow[]): P
 
 export function mapPortfolio(
   row: PortfolioRow,
-  positions: Position[]
+  positions: Position[],
+  cashFlows: import("@/lib/types").CashFlow[] = []
 ): Portfolio {
   return {
     id: row.id,
@@ -130,6 +132,7 @@ export function mapPortfolio(
     color: row.color ?? undefined,
     positions,
     categories: [],
+    cashFlows,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
   };
@@ -177,7 +180,7 @@ export function transactionToInsert(
     quantity,
     price,
     fees,
-    taxes,
+    taxes: tx.taxes ?? taxes,
     date: tx.date,
     notes,
   };

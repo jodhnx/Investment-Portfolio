@@ -8,6 +8,7 @@ import type {
   AppState,
   AppSettings,
   AssetSearchResult,
+  CashFlow,
   Category,
   Dividend,
   Portfolio,
@@ -31,6 +32,12 @@ import {
   syncProfileUpdate,
   syncSnapshotInsert,
   syncTransactionInsert,
+  syncTransactionUpdate,
+  syncTransactionDelete,
+  syncDividendDelete,
+  syncCashFlowInsert,
+  syncCashFlowUpdate,
+  syncCashFlowDelete,
   syncWatchlistDelete,
   syncWatchlistInsert,
 } from "@/lib/supabase/sync";
@@ -68,7 +75,13 @@ export interface PortfolioStore extends AppState {
   updatePosition: (id: string, data: Partial<Position>) => void;
   deletePosition: (id: string) => void;
   addTransaction: (positionId: string, tx: Omit<Transaction, "id">) => void;
+  updateTransaction: (positionId: string, txId: string, data: Partial<Transaction>) => void;
+  deleteTransaction: (positionId: string, txId: string) => void;
   addDividend: (positionId: string, div: Omit<Dividend, "id">) => void;
+  deleteDividend: (positionId: string, divId: string) => void;
+  addCashFlow: (flow: Omit<CashFlow, "id">) => void;
+  updateCashFlow: (id: string, data: Partial<CashFlow>) => void;
+  deleteCashFlow: (id: string) => void;
   addPriceAlert: (positionId: string, alert: Omit<PriceAlert, "id" | "triggered">) => void;
   addCategory: (category: Omit<Category, "id">) => void;
   updatePrices: (updates: Record<string, { price: number; change24h?: number; changePercent24h?: number }>) => void;
@@ -214,6 +227,7 @@ export const usePortfolioStore = create<PortfolioStore>()(
         color: "#6366f1",
         positions: [],
         categories: [],
+        cashFlows: [],
         createdAt: new Date().toISOString(),
         updatedAt: new Date().toISOString(),
       };
@@ -354,6 +368,56 @@ export const usePortfolioStore = create<PortfolioStore>()(
       );
     },
 
+    updateTransaction: (positionId, txId, data) => {
+      get().pushHistory();
+      const pid = get().activePortfolioId;
+      let updated: Transaction | undefined;
+      set((s) =>
+        withUpdatedPortfolio(s, pid, (p) => ({
+          ...p,
+          positions: p.positions.map((pos) => {
+            if (pos.id !== positionId) return pos;
+            return {
+              ...pos,
+              transactions: pos.transactions.map((tx) => {
+                if (tx.id !== txId) return tx;
+                updated = { ...tx, ...data };
+                return updated;
+              }),
+              updatedAt: new Date().toISOString(),
+            };
+          }),
+        }))
+      );
+      if (updated) {
+        syncTransactionUpdate(updated, positionId).then(({ error }) =>
+          handleSyncError(error, "Transaktion aktualisieren")
+        );
+      }
+    },
+
+    deleteTransaction: (positionId, txId) => {
+      get().pushHistory();
+      const pid = get().activePortfolioId;
+      set((s) =>
+        withUpdatedPortfolio(s, pid, (p) => ({
+          ...p,
+          positions: p.positions.map((pos) =>
+            pos.id === positionId
+              ? {
+                  ...pos,
+                  transactions: pos.transactions.filter((tx) => tx.id !== txId),
+                  updatedAt: new Date().toISOString(),
+                }
+              : pos
+          ),
+        }))
+      );
+      syncTransactionDelete(txId).then(({ error }) =>
+        handleSyncError(error, "Transaktion löschen")
+      );
+    },
+
     addDividend: (positionId, div) => {
       get().pushHistory();
       const pid = get().activePortfolioId;
@@ -368,6 +432,74 @@ export const usePortfolioStore = create<PortfolioStore>()(
       );
       syncDividendInsert(dividend, positionId).then(({ error }) =>
         handleSyncError(error, "Dividende speichern")
+      );
+    },
+
+    deleteDividend: (positionId, divId) => {
+      get().pushHistory();
+      const pid = get().activePortfolioId;
+      set((s) =>
+        withUpdatedPortfolio(s, pid, (p) => ({
+          ...p,
+          positions: p.positions.map((pos) =>
+            pos.id === positionId
+              ? { ...pos, dividends: pos.dividends.filter((d) => d.id !== divId) }
+              : pos
+          ),
+        }))
+      );
+      syncDividendDelete(divId).then(({ error }) =>
+        handleSyncError(error, "Dividende löschen")
+      );
+    },
+
+    addCashFlow: (flow) => {
+      get().pushHistory();
+      const pid = get().activePortfolioId;
+      const entry: CashFlow = { ...flow, id: uuidv4() };
+      set((s) =>
+        withUpdatedPortfolio(s, pid, (p) => ({
+          ...p,
+          cashFlows: [...(p.cashFlows ?? []), entry],
+        }))
+      );
+      syncCashFlowInsert(entry, pid).then(({ error }) =>
+        handleSyncError(error, "Ein-/Auszahlung speichern")
+      );
+    },
+
+    updateCashFlow: (id, data) => {
+      get().pushHistory();
+      const pid = get().activePortfolioId;
+      let updated: CashFlow | undefined;
+      set((s) =>
+        withUpdatedPortfolio(s, pid, (p) => ({
+          ...p,
+          cashFlows: (p.cashFlows ?? []).map((c) => {
+            if (c.id !== id) return c;
+            updated = { ...c, ...data };
+            return updated;
+          }),
+        }))
+      );
+      if (updated) {
+        syncCashFlowUpdate(updated).then(({ error }) =>
+          handleSyncError(error, "Kapitalbewegung aktualisieren")
+        );
+      }
+    },
+
+    deleteCashFlow: (id) => {
+      get().pushHistory();
+      const pid = get().activePortfolioId;
+      set((s) =>
+        withUpdatedPortfolio(s, pid, (p) => ({
+          ...p,
+          cashFlows: (p.cashFlows ?? []).filter((c) => c.id !== id),
+        }))
+      );
+      syncCashFlowDelete(id).then(({ error }) =>
+        handleSyncError(error, "Kapitalbewegung löschen")
       );
     },
 

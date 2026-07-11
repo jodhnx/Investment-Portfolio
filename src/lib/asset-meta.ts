@@ -6,6 +6,8 @@ export interface AssetMeta {
   icon?: string;
   imageUrl?: string;
   currency?: string;
+  isin?: string;
+  wkn?: string;
 }
 
 export interface PositionNotesPayload {

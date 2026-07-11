@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useMemo, useState } from "react";
 import {
   useReactTable,
@@ -56,7 +57,10 @@ export function AssetsTable() {
         accessorKey: "name",
         header: "Asset",
         cell: ({ row }) => (
-          <div className="flex min-w-[140px] items-center gap-2">
+          <Link
+            href={`/assets/${row.original.id}`}
+            className="flex min-w-[140px] items-center gap-2 rounded-lg transition-colors hover:opacity-80"
+          >
             <Avatar className="h-8 w-8">
               <AvatarImage src={row.original.logoUrl} />
               <AvatarFallback style={{ backgroundColor: row.original.color }}>
@@ -67,7 +71,7 @@ export function AssetsTable() {
               <div className="font-medium">{row.original.name}</div>
               <div className="text-xs text-muted-foreground">{row.original.symbol}</div>
             </div>
-          </div>
+          </Link>
         ),
       },
       {

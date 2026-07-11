@@ -6,10 +6,10 @@ import {
   TrendingDown,
   Wallet,
   PiggyBank,
-  BarChart3,
   Layers,
   ArrowLeftRight,
-  Percent,
+  Banknote,
+  Landmark,
 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { formatCurrency, formatPercent } from "@/lib/calculations";
@@ -23,20 +23,13 @@ interface StatsCardsProps {
 
 export function StatsCards({ stats, currency = "EUR" }: StatsCardsProps) {
   const cards = [
+    { title: "Gesamtvermögen", value: formatCurrency(stats.totalValue, currency), icon: Wallet, accent: "from-blue-500/20 to-blue-500/5" },
+    { title: "Freies Kapital", value: formatCurrency(stats.freeCapital, currency), icon: Banknote, accent: "from-cyan-500/20 to-cyan-500/5" },
+    { title: "Investiert", value: formatCurrency(stats.investedCapital, currency), icon: PiggyBank, accent: "from-violet-500/20 to-violet-500/5" },
+    { title: "Einzahlungen", value: formatCurrency(stats.totalDeposits, currency), icon: Landmark, accent: "from-emerald-500/15 to-emerald-500/5" },
+    { title: "Auszahlungen", value: formatCurrency(stats.totalWithdrawals, currency), icon: Landmark, accent: "from-orange-500/15 to-orange-500/5" },
     {
-      title: "Gesamtvermögen",
-      value: formatCurrency(stats.totalValue, currency),
-      icon: Wallet,
-      accent: "from-blue-500/20 to-blue-500/5",
-    },
-    {
-      title: "Gesamtinvestition",
-      value: formatCurrency(stats.totalInvested, currency),
-      icon: PiggyBank,
-      accent: "from-violet-500/20 to-violet-500/5",
-    },
-    {
-      title: "Gesamtgewinn",
+      title: "G/V gesamt",
       value: formatCurrency(stats.profitLoss, currency),
       sub: formatPercent(stats.profitLossPercent),
       icon: stats.profitLoss >= 0 ? TrendingUp : TrendingDown,
@@ -44,59 +37,42 @@ export function StatsCards({ stats, currency = "EUR" }: StatsCardsProps) {
       accent: stats.profitLoss >= 0 ? "from-emerald-500/20 to-emerald-500/5" : "from-red-500/20 to-red-500/5",
     },
     {
-      title: "Gewinn %",
-      value: formatPercent(stats.profitLossPercent),
-      icon: Percent,
-      valueColor: stats.profitLossPercent >= 0 ? "text-emerald-500" : "text-red-500",
-      accent: "from-amber-500/20 to-amber-500/5",
-    },
-    {
-      title: "Tagesgewinn",
-      value: formatCurrency(stats.dayGain, currency),
+      title: "Realisiert",
+      value: formatCurrency(stats.realizedProfit, currency),
+      valueColor: stats.realizedProfit >= 0 ? "text-emerald-500" : "text-red-500",
       icon: TrendingUp,
-      valueColor: "text-emerald-500",
-      accent: "from-emerald-500/15 to-emerald-500/5",
+      accent: "from-green-500/15 to-green-500/5",
     },
     {
-      title: "Tagesverlust",
-      value: formatCurrency(stats.dayLoss, currency),
+      title: "Unrealisiert",
+      value: formatCurrency(stats.unrealizedProfit, currency),
+      valueColor: stats.unrealizedProfit >= 0 ? "text-emerald-500" : "text-red-500",
       icon: TrendingDown,
-      valueColor: stats.dayLoss > 0 ? "text-red-500" : "text-muted-foreground",
-      accent: "from-red-500/15 to-red-500/5",
+      accent: "from-amber-500/15 to-amber-500/5",
     },
-    {
-      title: "Anzahl Assets",
-      value: String(stats.positionCount),
-      icon: Layers,
-      accent: "from-slate-500/20 to-slate-500/5",
-    },
-    {
-      title: "Transaktionen",
-      value: String(stats.transactionCount),
-      icon: ArrowLeftRight,
-      accent: "from-cyan-500/20 to-cyan-500/5",
-    },
+    { title: "Assets", value: String(stats.positionCount), icon: Layers, accent: "from-slate-500/20 to-slate-500/5" },
+    { title: "Transaktionen", value: String(stats.transactionCount), icon: ArrowLeftRight, accent: "from-indigo-500/20 to-indigo-500/5" },
   ];
 
   return (
-    <div className="grid gap-3 grid-cols-2 lg:grid-cols-4">
+    <div className="grid gap-3 grid-cols-2 lg:grid-cols-5">
       {cards.map((card, i) => (
         <motion.div
           key={card.title}
           initial={{ opacity: 0, y: 12 }}
           animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: i * 0.04, duration: 0.3 }}
+          transition={{ delay: i * 0.03, duration: 0.3 }}
         >
-          <Card className={cn("relative overflow-hidden border-border/60 bg-card/80 backdrop-blur-sm")}>
+          <Card className="relative overflow-hidden border-border/60 bg-card/80 backdrop-blur-sm">
             <div className={cn("pointer-events-none absolute inset-0 bg-gradient-to-br opacity-60", card.accent)} />
             <CardHeader className="relative flex flex-row items-center justify-between pb-2">
-              <CardTitle className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground sm:text-xs">
+              <CardTitle className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground sm:text-xs">
                 {card.title}
               </CardTitle>
               <card.icon className="h-4 w-4 text-muted-foreground" />
             </CardHeader>
             <CardContent className="relative">
-              <div className={cn("text-lg font-bold tabular-nums sm:text-xl", card.valueColor)}>
+              <div className={cn("text-base font-bold tabular-nums sm:text-lg", card.valueColor)}>
                 {card.value}
               </div>
               {card.sub && (

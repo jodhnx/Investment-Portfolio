@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { usePathname } from "next/navigation";
 import { motion, AnimatePresence } from "framer-motion";
 import { Plus } from "lucide-react";
 import { usePortfolioStore } from "@/store/portfolio-store";
@@ -9,9 +10,13 @@ import { TransactionFormDialog } from "@/components/transactions/transaction-for
 import { cn } from "@/lib/utils";
 
 export function TransactionFab() {
+  const pathname = usePathname();
   const [open, setOpen] = useState(false);
   const portfolio = usePortfolioStore(selectActivePortfolio);
   const hasAssets = (portfolio?.positions.filter((p) => !p.isWatchlist).length ?? 0) > 0;
+
+  const assetMatch = pathname.match(/^\/assets\/([^/]+)$/);
+  const defaultPositionId = assetMatch?.[1];
 
   if (!hasAssets) return null;
 
@@ -35,7 +40,7 @@ export function TransactionFab() {
           <Plus className="h-6 w-6" />
         </motion.button>
       </AnimatePresence>
-      <TransactionFormDialog open={open} onOpenChange={setOpen} />
+      <TransactionFormDialog open={open} onOpenChange={setOpen} defaultPositionId={defaultPositionId} />
     </>
   );
 }
