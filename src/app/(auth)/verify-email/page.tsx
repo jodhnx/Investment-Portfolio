@@ -6,6 +6,7 @@ import { Mail, Loader2, RefreshCw } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { getAuthCallbackUrl } from "@/lib/auth/url";
 import { mapAuthError } from "@/lib/auth/errors";
+import { logAuthDebug, logAuthError } from "@/lib/auth/logger";
 import { AuthLayout, AuthLink } from "@/components/auth/auth-layout";
 import { AuthAlert } from "@/components/auth/auth-alert";
 import { Button } from "@/components/ui/button";
@@ -26,25 +27,36 @@ function VerifyEmailContent() {
 
     setResending(true);
     setError(null);
-    const supabase = createClient();
-    const { error: resendError } = await supabase.auth.resend({
-      type: "signup",
-      email,
-      options: {
-        emailRedirectTo: getAuthCallbackUrl({ next: "/onboarding" }),
-      },
-    });
-    setResending(false);
 
-    if (resendError) {
-      const msg = mapAuthError(resendError.message, resendError.code);
+    const emailRedirectTo = getAuthCallbackUrl({ next: "/onboarding" });
+    logAuthDebug("verify-email:resend", { email, emailRedirectTo });
+
+    try {
+      const supabase = createClient();
+      const { error: resendError } = await supabase.auth.resend({
+        type: "signup",
+        email,
+        options: { emailRedirectTo },
+      });
+
+      if (resendError) {
+        logAuthError("verify-email:resend", resendError);
+        const msg = mapAuthError(resendError.message, resendError.code);
+        setError(msg);
+        toast.error(msg);
+        return;
+      }
+
+      setResent(true);
+      toast.success("Bestätigungs-E-Mail erneut gesendet!");
+    } catch (err) {
+      logAuthError("verify-email:resend:unexpected", err);
+      const msg = "Verbindungsfehler. Bitte prüfe deine Internetverbindung.";
       setError(msg);
       toast.error(msg);
-      return;
+    } finally {
+      setResending(false);
     }
-
-    setResent(true);
-    toast.success("Bestätigungs-E-Mail erneut gesendet!");
   };
 
   return (

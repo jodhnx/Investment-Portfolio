@@ -5,6 +5,7 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { Loader2 } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { mapAuthError, getAuthErrorMessage } from "@/lib/auth/errors";
+import { logAuthError, logAuthDebug } from "@/lib/auth/logger";
 import { validateEmail } from "@/lib/auth/validation";
 import { AuthLayout, AuthLink } from "@/components/auth/auth-layout";
 import { FormField, PasswordField } from "@/components/auth/form-fields";
@@ -16,12 +17,67 @@ import { Label } from "@/components/ui/label";
 import { Separator } from "@/components/ui/separator";
 import { toast } from "sonner";
 
+const MAX_ATTEMPTS = 5;
+
+function checkRateLimit(): boolean {
+  try {
+    const raw = sessionStorage.getItem("auth_attempts");
+    if (!raw) return false;
+    const { count, resetAt } = JSON.parse(raw) as { count: number; resetAt: number };
+    if (Date.now() > resetAt) {
+      sessionStorage.removeItem("auth_attempts");
+      return false;
+    }
+    return count >= MAX_ATTEMPTS;
+  } catch {
+    return false;
+  }
+}
+
+function recordFailedAttempt(): void {
+  try {
+    const raw = sessionStorage.getItem("auth_attempts");
+    const now = Date.now();
+    const window = 15 * 60 * 1000;
+    if (!raw) {
+      sessionStorage.setItem(
+        "auth_attempts",
+        JSON.stringify({ count: 1, resetAt: now + window })
+      );
+      return;
+    }
+    const data = JSON.parse(raw) as { count: number; resetAt: number };
+    if (now > data.resetAt) {
+      sessionStorage.setItem(
+        "auth_attempts",
+        JSON.stringify({ count: 1, resetAt: now + window })
+      );
+    } else {
+      sessionStorage.setItem(
+        "auth_attempts",
+        JSON.stringify({ count: data.count + 1, resetAt: data.resetAt })
+      );
+    }
+  } catch {
+    // ignore
+  }
+}
+
+function clearAttempts(): void {
+  try {
+    sessionStorage.removeItem("auth_attempts");
+  } catch {
+    // ignore
+  }
+}
+
 export function LoginForm() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const redirect = searchParams.get("redirect") ?? "/";
   const urlError = searchParams.get("error");
   const urlMessage = searchParams.get("message");
+  const confirmed = searchParams.get("confirmed");
 
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -29,16 +85,28 @@ export function LoginForm() {
   const [loading, setLoading] = useState(false);
   const [emailError, setEmailError] = useState<string | undefined>();
   const [globalError, setGlobalError] = useState<string | null>(null);
+  const [successMsg, setSuccessMsg] = useState<string | null>(null);
 
   useEffect(() => {
     if (urlError || urlMessage) {
       setGlobalError(getAuthErrorMessage(urlError, urlMessage));
     }
-  }, [urlError, urlMessage]);
+    if (confirmed === "1") {
+      setSuccessMsg("E-Mail bestätigt! Du kannst dich jetzt anmelden.");
+    }
+  }, [urlError, urlMessage, confirmed]);
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     setGlobalError(null);
+    setSuccessMsg(null);
+
+    if (checkRateLimit()) {
+      const msg = "Zu viele Anmeldeversuche. Bitte warte 15 Minuten.";
+      setGlobalError(msg);
+      toast.error(msg);
+      return;
+    }
 
     const err = validateEmail(email);
     if (err) {
@@ -55,35 +123,48 @@ export function LoginForm() {
     setLoading(true);
 
     try {
-      const res = await fetch("/api/auth/signin", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email: email.trim(), password }),
+      const supabase = createClient();
+
+      logAuthDebug("login:attempt", { email: email.trim() });
+
+      const { data, error } = await supabase.auth.signInWithPassword({
+        email: email.trim(),
+        password,
       });
 
-      const data = await res.json();
-
-      if (!res.ok) {
-        const msg = data.error ?? "Anmeldung fehlgeschlagen.";
+      if (error) {
+        logAuthError("login", error);
+        recordFailedAttempt();
+        const msg = mapAuthError(error.message, error.code);
         setGlobalError(msg);
         toast.error(msg);
 
-        if (data.code === "email_not_confirmed") {
+        if (error.code === "email_not_confirmed") {
           router.push(`/verify-email?email=${encodeURIComponent(email.trim())}`);
         }
         return;
       }
 
-      // Session-Cookies wurden serverseitig gesetzt – Client synchronisieren
-      const supabase = createClient();
-      await supabase.auth.getSession();
+      if (data.user && !data.user.email_confirmed_at) {
+        await supabase.auth.signOut();
+        const msg = mapAuthError("Email not confirmed", "email_not_confirmed");
+        setGlobalError(msg);
+        toast.error(msg);
+        router.push(`/verify-email?email=${encodeURIComponent(email.trim())}`);
+        return;
+      }
+
+      clearAttempts();
+      logAuthDebug("login:success", { userId: data.user?.id });
 
       toast.success("Erfolgreich angemeldet!");
       router.push(redirect);
       router.refresh();
-    } catch {
-      setGlobalError("Keine Internetverbindung. Bitte prüfe deine Verbindung.");
-      toast.error("Verbindungsfehler");
+    } catch (err) {
+      logAuthError("login:unexpected", err);
+      const msg = "Keine Internetverbindung oder Serverfehler.";
+      setGlobalError(msg);
+      toast.error(msg);
     } finally {
       setLoading(false);
     }
@@ -91,6 +172,7 @@ export function LoginForm() {
 
   return (
     <AuthLayout title="Willkommen zurück" subtitle="Melde dich an, um dein Portfolio zu verwalten">
+      {successMsg && <AuthAlert variant="success" message={successMsg} />}
       {globalError && <AuthAlert message={globalError} />}
 
       <form onSubmit={handleLogin} className="space-y-4">

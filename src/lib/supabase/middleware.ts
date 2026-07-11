@@ -1,6 +1,7 @@
 import { createServerClient } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
 import { asProfile } from "./helpers";
+import { redirectWithCookies } from "./route-handler";
 
 const PUBLIC_ROUTES = [
   "/login",
@@ -18,37 +19,38 @@ const UNCONFIRMED_ALLOWED = [
   "/auth/error",
   "/login",
   "/register",
+  "/forgot-password",
 ];
 
 export async function updateSession(request: NextRequest) {
-  if (!process.env.NEXT_PUBLIC_SUPABASE_URL || !process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY) {
+  const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
+  const key = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+
+  if (!url || !key) {
+    console.error("[Auth:middleware] Supabase env vars missing");
     return NextResponse.next({ request });
   }
 
   let supabaseResponse = NextResponse.next({ request });
 
-  const supabase = createServerClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
-    {
-      cookies: {
-        getAll() {
-          return request.cookies.getAll();
-        },
-        setAll(cookiesToSet) {
-          cookiesToSet.forEach(({ name, value }) =>
-            request.cookies.set(name, value)
-          );
-          supabaseResponse = NextResponse.next({ request });
-          cookiesToSet.forEach(({ name, value, options }) =>
-            supabaseResponse.cookies.set(name, value, options)
-          );
-        },
+  const supabase = createServerClient(url, key, {
+    cookies: {
+      getAll() {
+        return request.cookies.getAll();
       },
-    }
-  );
+      setAll(cookiesToSet) {
+        cookiesToSet.forEach(({ name, value }) =>
+          request.cookies.set(name, value)
+        );
+        supabaseResponse = NextResponse.next({ request });
+        cookiesToSet.forEach(({ name, value, options }) =>
+          supabaseResponse.cookies.set(name, value, options)
+        );
+      },
+    },
+  });
 
-  // Session refreshen – hält Login beim Seiten-Reload
+  // Session refreshen – KRITISCH: Cookies auf supabaseResponse, nicht auf Redirect verwerfen!
   const {
     data: { user },
   } = await supabase.auth.getUser();
@@ -58,47 +60,50 @@ export async function updateSession(request: NextRequest) {
   const isOnboarding = pathname.startsWith("/onboarding");
 
   if (!user && !isPublic) {
-    const url = request.nextUrl.clone();
-    url.pathname = "/login";
-    url.searchParams.set("redirect", pathname);
-    return NextResponse.redirect(url);
+    return redirectWithCookies(request, supabaseResponse, "/login", {
+      redirect: pathname,
+    });
   }
 
   if (user) {
     const emailConfirmed = !!user.email_confirmed_at;
 
-    if (!emailConfirmed && !UNCONFIRMED_ALLOWED.some((r) => pathname.startsWith(r))) {
-      const url = request.nextUrl.clone();
-      url.pathname = "/verify-email";
-      if (user.email) url.searchParams.set("email", user.email);
-      return NextResponse.redirect(url);
+    if (
+      !emailConfirmed &&
+      !UNCONFIRMED_ALLOWED.some((r) => pathname.startsWith(r))
+    ) {
+      return redirectWithCookies(request, supabaseResponse, "/verify-email", {
+        ...(user.email ? { email: user.email } : {}),
+      });
     }
 
     const { data: profileData } = await supabase
       .from("profiles")
       .select("onboarding_complete")
       .eq("auth_user_id", user.id)
-      .single();
+      .maybeSingle();
 
     const profile = asProfile(profileData);
-    const needsOnboarding = emailConfirmed && profile && !profile.onboarding_complete;
+    const needsOnboarding =
+      emailConfirmed && (!profile || !profile.onboarding_complete);
 
     if (needsOnboarding && !isOnboarding && !isPublic) {
-      const url = request.nextUrl.clone();
-      url.pathname = "/onboarding";
-      return NextResponse.redirect(url);
+      return redirectWithCookies(request, supabaseResponse, "/onboarding");
     }
 
     if (!needsOnboarding && isOnboarding) {
-      const url = request.nextUrl.clone();
-      url.pathname = "/";
-      return NextResponse.redirect(url);
+      return redirectWithCookies(request, supabaseResponse, "/");
     }
 
-    if (isPublic && !pathname.startsWith("/auth/") && emailConfirmed && !needsOnboarding) {
-      const url = request.nextUrl.clone();
-      url.pathname = "/";
-      return NextResponse.redirect(url);
+    if (
+      isPublic &&
+      !pathname.startsWith("/auth/") &&
+      pathname !== "/verify-email" &&
+      pathname !== "/reset-password" &&
+      emailConfirmed &&
+      !needsOnboarding
+    ) {
+      return redirectWithCookies(request, supabaseResponse, "/");
     }
 
     if (
@@ -107,9 +112,7 @@ export async function updateSession(request: NextRequest) {
       pathname !== "/verify-email" &&
       needsOnboarding
     ) {
-      const url = request.nextUrl.clone();
-      url.pathname = "/onboarding";
-      return NextResponse.redirect(url);
+      return redirectWithCookies(request, supabaseResponse, "/onboarding");
     }
   }
 

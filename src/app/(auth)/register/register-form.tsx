@@ -6,6 +6,7 @@ import { Loader2 } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { getAuthCallbackUrl } from "@/lib/auth/url";
 import { mapAuthError } from "@/lib/auth/errors";
+import { logAuthError, logAuthDebug } from "@/lib/auth/logger";
 import {
   validateRegisterForm,
   hasFieldErrors,
@@ -52,44 +53,80 @@ export function RegisterForm() {
     setErrors({});
 
     setLoading(true);
-    const supabase = createClient();
 
-    const { data, error } = await supabase.auth.signUp({
-      email: email.trim(),
-      password,
-      options: {
-        data: {
-          first_name: firstName.trim(),
-          last_name: lastName.trim(),
-          username: username.trim() || null,
-          name: `${firstName.trim()} ${lastName.trim()}`,
+    const callbackUrl = getAuthCallbackUrl({ next: "/onboarding" });
+    logAuthDebug("register:attempt", { email: email.trim(), callbackUrl });
+
+    try {
+      const supabase = createClient();
+
+      const { data, error } = await supabase.auth.signUp({
+        email: email.trim(),
+        password,
+        options: {
+          data: {
+            first_name: firstName.trim(),
+            last_name: lastName.trim(),
+            username: username.trim() || null,
+            name: `${firstName.trim()} ${lastName.trim()}`,
+          },
+          emailRedirectTo: callbackUrl,
         },
-        emailRedirectTo: getAuthCallbackUrl({ next: "/onboarding" }),
-      },
-    });
+      });
 
-    setLoading(false);
+      if (error) {
+        logAuthError("register", error);
+        const msg = mapAuthError(error.message, error.code);
+        setGlobalError(msg);
+        toast.error(msg);
+        return;
+      }
 
-    if (error) {
-      const msg = mapAuthError(error.message, error.code);
+      logAuthDebug("register:response", {
+        userId: data.user?.id,
+        hasSession: !!data.session,
+        identities: data.user?.identities?.length,
+      });
+
+      // Supabase: leeres identities-Array = E-Mail existiert bereits
+      if (data.user?.identities?.length === 0) {
+        const msg = "Diese E-Mail-Adresse ist bereits registriert.";
+        logAuthError("register:duplicate", msg);
+        setGlobalError(msg);
+        toast.error(msg);
+        return;
+      }
+
+      if (!data.user) {
+        const msg = "Registrierung fehlgeschlagen. Bitte versuche es erneut.";
+        logAuthError("register:no-user", msg);
+        setGlobalError(msg);
+        toast.error(msg);
+        return;
+      }
+
+      // E-Mail-Bestätigung aktiv → keine Session, E-Mail wurde gesendet
+      if (!data.session) {
+        toast.success("Bestätigungs-E-Mail gesendet!", {
+          description: `Prüfe dein Postfach (${email.trim()}). Der Link führt zu ${callbackUrl}`,
+          duration: 8000,
+        });
+        router.push(`/verify-email?email=${encodeURIComponent(email.trim())}`);
+        return;
+      }
+
+      // Bestätigung deaktiviert → direkt weiter
+      toast.success("Konto erstellt!");
+      router.push("/onboarding");
+      router.refresh();
+    } catch (err) {
+      logAuthError("register:unexpected", err);
+      const msg = "Verbindungsfehler. Bitte prüfe deine Internetverbindung.";
       setGlobalError(msg);
       toast.error(msg);
-      return;
+    } finally {
+      setLoading(false);
     }
-
-    // E-Mail-Bestätigung erforderlich → keine Session
-    if (data.user && !data.session) {
-      toast.success("Bestätigungs-E-Mail gesendet!", {
-        description: "Bitte prüfe dein Postfach und klicke auf den Bestätigungslink.",
-      });
-      router.push(`/verify-email?email=${encodeURIComponent(email.trim())}`);
-      return;
-    }
-
-    // Fallback falls Bestätigung deaktiviert
-    toast.success("Konto erstellt!");
-    router.push("/onboarding");
-    router.refresh();
   };
 
   return (

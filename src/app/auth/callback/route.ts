@@ -1,8 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
-import { createClient } from "@/lib/supabase/server";
+import { createServerClient } from "@supabase/ssr";
 import { getSiteUrl } from "@/lib/auth/url";
 import { asProfile } from "@/lib/supabase/helpers";
 import { syncProfileFromUser } from "@/lib/auth/profile-sync";
+import { createRouteHandlerClient } from "@/lib/supabase/route-handler";
+import { logAuthDebug, logAuthError } from "@/lib/auth/logger";
 import type { EmailOtpType } from "@supabase/supabase-js";
 
 export async function GET(request: NextRequest) {
@@ -16,7 +18,16 @@ export async function GET(request: NextRequest) {
   const error = requestUrl.searchParams.get("error");
   const errorDescription = requestUrl.searchParams.get("error_description");
 
+  logAuthDebug("callback", {
+    hasCode: !!code,
+    type,
+    next,
+    error,
+    siteUrl,
+  });
+
   if (error) {
+    logAuthError("callback:oauth", { message: errorDescription ?? error });
     const params = new URLSearchParams({
       error,
       message: errorDescription ?? error,
@@ -24,13 +35,17 @@ export async function GET(request: NextRequest) {
     return NextResponse.redirect(`${siteUrl}/auth/error?${params}`);
   }
 
-  const supabase = await createClient();
-
-  // PKCE-Flow (E-Mail-Bestätigung, OAuth, Passwort-Reset)
+  // PKCE-Flow: E-Mail-Bestätigung, OAuth, Passwort-Reset
   if (code) {
+    // Eine Response für den gesamten Flow – Session-Cookies bleiben mit Optionen erhalten
+    let destination = type === "recovery" ? "/reset-password" : next;
+    const response = NextResponse.redirect(`${siteUrl}${destination}`);
+
+    const supabase = createRouteHandlerClient(request, response);
     const { error: exchangeError } = await supabase.auth.exchangeCodeForSession(code);
 
     if (exchangeError) {
+      logAuthError("callback:exchange", exchangeError);
       const params = new URLSearchParams({
         error: "exchange_failed",
         message: exchangeError.message,
@@ -40,41 +55,54 @@ export async function GET(request: NextRequest) {
 
     const {
       data: { user },
+      error: userError,
     } = await supabase.auth.getUser();
 
-    if (!user) {
+    if (userError || !user) {
+      logAuthError("callback:user", userError ?? "No user after exchange");
       return NextResponse.redirect(`${siteUrl}/auth/error?error=no_user`);
     }
 
-    await syncProfileFromUser(supabase, user);
+    logAuthDebug("callback:success", {
+      userId: user.id,
+      email: user.email,
+      confirmed: !!user.email_confirmed_at,
+    });
 
-    // Passwort-Reset-Flow
-    if (type === "recovery") {
-      return NextResponse.redirect(`${siteUrl}/reset-password`);
+    const { error: profileError } = await syncProfileFromUser(supabase, user);
+    if (profileError) {
+      logAuthError("callback:profile", profileError);
     }
 
-    // E-Mail gerade bestätigt → Onboarding oder Dashboard
-    const { data: profileData } = await supabase
-      .from("profiles")
-      .select("onboarding_complete")
-      .eq("auth_user_id", user.id)
-      .single();
+    if (type !== "recovery") {
+      const { data: profileData } = await supabase
+        .from("profiles")
+        .select("onboarding_complete")
+        .eq("auth_user_id", user.id)
+        .maybeSingle();
 
-    const profile = asProfile(profileData);
-    const destination =
-      profile && !profile.onboarding_complete ? "/onboarding" : next;
+      const profile = asProfile(profileData);
+      destination =
+        !profile || !profile.onboarding_complete ? "/onboarding" : next;
+    }
 
-    return NextResponse.redirect(`${siteUrl}${destination}`);
+    response.headers.set("Location", `${siteUrl}${destination}`);
+    return response;
   }
 
   // Legacy OTP-Flow (token_hash)
   if (tokenHash && type) {
+    let destination = type === "recovery" ? "/reset-password" : next;
+    const response = NextResponse.redirect(`${siteUrl}${destination}`);
+    const supabase = createRouteHandlerClient(request, response);
+
     const { error: otpError } = await supabase.auth.verifyOtp({
       token_hash: tokenHash,
       type: type as EmailOtpType,
     });
 
     if (otpError) {
+      logAuthError("callback:otp", otpError);
       const params = new URLSearchParams({
         error: "otp_invalid",
         message: otpError.message,
@@ -85,17 +113,13 @@ export async function GET(request: NextRequest) {
     const {
       data: { user },
     } = await supabase.auth.getUser();
-
     if (user) {
       await syncProfileFromUser(supabase, user);
     }
 
-    if (type === "recovery") {
-      return NextResponse.redirect(`${siteUrl}/reset-password`);
-    }
-
-    return NextResponse.redirect(`${siteUrl}${next}`);
+    return response;
   }
 
+  logAuthError("callback", "Missing code and token_hash");
   return NextResponse.redirect(`${siteUrl}/auth/error?error=missing_code`);
 }

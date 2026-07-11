@@ -4,6 +4,7 @@ import { Loader2 } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { getAuthCallbackUrl } from "@/lib/auth/url";
 import { mapAuthError } from "@/lib/auth/errors";
+import { logAuthDebug, logAuthError } from "@/lib/auth/logger";
 import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
 import { useState } from "react";
@@ -13,15 +14,23 @@ export function OAuthButtons({ redirect = "/" }: { redirect?: string }) {
 
   const handleOAuth = async (provider: "google" | "github") => {
     setLoading(provider);
-    const supabase = createClient();
-    const { error } = await supabase.auth.signInWithOAuth({
-      provider,
-      options: {
-        redirectTo: getAuthCallbackUrl({ next: redirect }),
-      },
-    });
-    if (error) {
-      toast.error(mapAuthError(error.message, error.code));
+    const redirectTo = getAuthCallbackUrl({ next: redirect });
+    logAuthDebug("oauth:attempt", { provider, redirectTo });
+
+    try {
+      const supabase = createClient();
+      const { error } = await supabase.auth.signInWithOAuth({
+        provider,
+        options: { redirectTo },
+      });
+      if (error) {
+        logAuthError(`oauth:${provider}`, error);
+        toast.error(mapAuthError(error.message, error.code));
+        setLoading(null);
+      }
+    } catch (err) {
+      logAuthError(`oauth:${provider}:unexpected`, err);
+      toast.error("Verbindungsfehler beim OAuth-Login.");
       setLoading(null);
     }
   };

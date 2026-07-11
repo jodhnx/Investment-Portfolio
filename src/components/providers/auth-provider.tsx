@@ -2,8 +2,9 @@
 
 import { createContext, useContext, useEffect, useState, useCallback } from "react";
 import type { User, Session } from "@supabase/supabase-js";
-import { createClient } from "@/lib/supabase/client";
+import { createClient, resetBrowserClient } from "@/lib/supabase/client";
 import { usePortfolioStore } from "@/store/portfolio-store";
+import { logAuthDebug, logAuthError } from "@/lib/auth/logger";
 
 interface AuthContextValue {
   user: User | null;
@@ -29,26 +30,35 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const reset = usePortfolioStore((s) => s.reset);
 
   const refreshSession = useCallback(async () => {
-    const supabase = createClient();
-    const {
-      data: { session: s },
-    } = await supabase.auth.getSession();
-    setSession(s);
-    setUser(s?.user ?? null);
+    try {
+      const supabase = createClient();
+      const {
+        data: { session: s },
+        error,
+      } = await supabase.auth.getSession();
+      if (error) logAuthError("refreshSession", error);
+      setSession(s);
+      setUser(s?.user ?? null);
+    } catch (err) {
+      logAuthError("refreshSession:unexpected", err);
+    }
   }, []);
 
   useEffect(() => {
     const supabase = createClient();
 
-    supabase.auth.getSession().then(({ data: { session: s } }) => {
+    supabase.auth.getSession().then(({ data: { session: s }, error }) => {
+      if (error) logAuthError("initSession", error);
       setSession(s);
       setUser(s?.user ?? null);
       setLoading(false);
+      logAuthDebug("initSession", { hasSession: !!s, userId: s?.user?.id });
     });
 
     const {
       data: { subscription },
     } = supabase.auth.onAuthStateChange(async (event, s) => {
+      logAuthDebug("authStateChange", { event, userId: s?.user?.id });
       setSession(s);
       setUser(s?.user ?? null);
       setLoading(false);
@@ -58,6 +68,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       }
       if (event === "SIGNED_OUT") {
         reset();
+        resetBrowserClient();
       }
       if (event === "TOKEN_REFRESHED" && s) {
         setSession(s);
@@ -69,11 +80,17 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }, [hydrate, reset]);
 
   const signOut = async () => {
-    const supabase = createClient();
-    await supabase.auth.signOut({ scope: "global" });
+    try {
+      const supabase = createClient();
+      const { error } = await supabase.auth.signOut({ scope: "global" });
+      if (error) logAuthError("signOut", error);
+    } catch (err) {
+      logAuthError("signOut:unexpected", err);
+    }
     setUser(null);
     setSession(null);
     reset();
+    resetBrowserClient();
   };
 
   return (

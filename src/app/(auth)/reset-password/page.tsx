@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { Loader2 } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { mapAuthError } from "@/lib/auth/errors";
+import { logAuthError } from "@/lib/auth/logger";
 import { validatePassword } from "@/lib/auth/validation";
 import { AuthLayout, AuthLink } from "@/components/auth/auth-layout";
 import { PasswordField } from "@/components/auth/form-fields";
@@ -51,20 +52,30 @@ export default function ResetPasswordPage() {
     setErrors({});
 
     setLoading(true);
-    const supabase = createClient();
-    const { error } = await supabase.auth.updateUser({ password });
-    setLoading(false);
 
-    if (error) {
-      const msg = mapAuthError(error.message, error.code);
+    try {
+      const supabase = createClient();
+      const { error } = await supabase.auth.updateUser({ password });
+
+      if (error) {
+        logAuthError("reset-password", error);
+        const msg = mapAuthError(error.message, error.code);
+        setGlobalError(msg);
+        toast.error(msg);
+        return;
+      }
+
+      toast.success("Passwort erfolgreich geändert!");
+      router.push("/");
+      router.refresh();
+    } catch (err) {
+      logAuthError("reset-password:unexpected", err);
+      const msg = "Verbindungsfehler. Bitte prüfe deine Internetverbindung.";
       setGlobalError(msg);
       toast.error(msg);
-      return;
+    } finally {
+      setLoading(false);
     }
-
-    toast.success("Passwort erfolgreich geändert!");
-    router.push("/");
-    router.refresh();
   };
 
   if (checking) {

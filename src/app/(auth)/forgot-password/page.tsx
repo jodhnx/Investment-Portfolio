@@ -5,6 +5,7 @@ import { Loader2, Mail } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { getAuthCallbackUrl } from "@/lib/auth/url";
 import { mapAuthError } from "@/lib/auth/errors";
+import { logAuthDebug, logAuthError } from "@/lib/auth/logger";
 import { validateEmail } from "@/lib/auth/validation";
 import { AuthLayout, AuthLink } from "@/components/auth/auth-layout";
 import { FormField } from "@/components/auth/form-fields";
@@ -31,24 +32,36 @@ export default function ForgotPasswordPage() {
     setFieldError(undefined);
 
     setLoading(true);
-    const supabase = createClient();
-    const { error: resetError } = await supabase.auth.resetPasswordForEmail(
-      email.trim(),
-      {
-        redirectTo: getAuthCallbackUrl({ type: "recovery" }),
-      }
-    );
-    setLoading(false);
 
-    if (resetError) {
-      const msg = mapAuthError(resetError.message, resetError.code);
+    const redirectTo = getAuthCallbackUrl({ type: "recovery", next: "/reset-password" });
+    logAuthDebug("forgot-password:attempt", { email: email.trim(), redirectTo });
+
+    try {
+      const supabase = createClient();
+      const { error: resetError } = await supabase.auth.resetPasswordForEmail(
+        email.trim(),
+        { redirectTo }
+      );
+
+      if (resetError) {
+        logAuthError("forgot-password", resetError);
+        const msg = mapAuthError(resetError.message, resetError.code);
+        setError(msg);
+        toast.error(msg);
+        return;
+      }
+
+      setSent(true);
+      toast.success("E-Mail gesendet!");
+    } catch (err) {
+      logAuthError("forgot-password:unexpected", err);
+      const msg = "Verbindungsfehler. Bitte prüfe deine Internetverbindung.";
       setError(msg);
       toast.error(msg);
-      return;
+    } finally {
+      setLoading(false);
     }
 
-    setSent(true);
-    toast.success("E-Mail gesendet!");
   };
 
   if (sent) {
