@@ -1,36 +1,87 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# InvestTrack – Portfolio & Investment Rechner
 
-## Getting Started
+Moderne Web-App für Krypto, Aktien, ETFs, Gold und Silber. Kombination aus Portfolio-Tracker, Excel-ähnlicher Tabelle und Investment-Rechnern.
 
-First, run the development server:
+## Features
+
+- **Dashboard** – Gesamtwert, G/V, Tagesänderung, Portfolio-Chart, Assetverteilung
+- **Portfolio-Tabelle** – Sortierbar, filterbar, verschiebbare/anpassbare Spalten, Virtualisierung für Performance
+- **Asset-Suche** – CoinGecko (Krypto) + Yahoo Finance (Aktien/ETFs)
+- **Käufe & Verkäufe** – Mehrere Transaktionen pro Position, automatischer Ø-Kaufpreis
+- **Rechner** – Investment, Sparplan, DCA
+- **Dividenden** – Erfassung und Auswertung
+- **Watchlist** – Assets ohne Kauf beobachten
+- **Import/Export** – CSV und JSON-Backup
+- **Undo/Redo** – Änderungen rückgängig machen
+- **Dark Mode** – Standard, Light Mode optional
+- **Persistenz** – Automatisches Speichern in LocalStorage (kein Server nötig)
+
+## Schnellstart
 
 ```bash
+cd crypto-invest
+npm install
 npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+Öffne [http://localhost:3000](http://localhost:3000)
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+> **Hinweis:** Der Ordner `K:\Crypto_Invest` war schreibgeschützt. Das Projekt liegt unter `C:\Users\benst\Crypto_Invest\crypto-invest`.
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+## Tech Stack
 
-## Learn More
+- **Frontend:** Next.js 16, React 19, TypeScript, Tailwind CSS 4, shadcn/ui
+- **Charts:** Recharts
+- **Tabellen:** TanStack Table + Virtual
+- **State:** Zustand + LocalStorage
+- **Backend (optional):** Prisma + PostgreSQL + NextAuth
 
-To learn more about Next.js, take a look at the following resources:
+## PostgreSQL & Cloud-Sync (optional)
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+```bash
+cp .env.example .env
+# DATABASE_URL setzen
+npx prisma migrate dev
+npx prisma generate
+```
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+## Deployment (Vercel)
 
-## Deploy on Vercel
+1. Repository auf GitHub pushen
+2. In Vercel importieren
+3. Umgebungsvariablen setzen (`DATABASE_URL`, `NEXTAUTH_SECRET`, …)
+4. Deploy
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+## Projektstruktur
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+```
+src/
+├── app/
+│   ├── (dashboard)/     # Hauptseiten
+│   └── api/             # Preis- & Such-APIs
+├── components/
+│   ├── calculators/
+│   ├── dashboard/
+│   ├── layout/
+│   └── portfolio/
+├── hooks/
+├── lib/
+│   ├── api/             # CoinGecko, Yahoo Finance
+│   ├── calculations.ts  # G/V, DCA, Sparplan
+│   └── storage.ts       # LocalStorage
+└── store/               # Zustand Store
+```
+
+## API-Quellen
+
+| Asset-Typ | API |
+|-----------|-----|
+| Krypto | CoinGecko |
+| Aktien/ETFs | Yahoo Finance |
+| Gold | CoinGecko |
+
+Preise werden automatisch alle 60 Sekunden aktualisiert (einstellbar).
+
+## Lizenz
+
+Privates Projekt – frei verwendbar.
