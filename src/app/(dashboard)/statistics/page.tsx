@@ -10,9 +10,10 @@ import {
   formatPercent,
 } from "@/lib/calculations";
 import { usePortfolioStore } from "@/store/portfolio-store";
+import { selectActivePortfolio } from "@/lib/store-selectors";
 
 export default function StatisticsPage() {
-  const portfolio = usePortfolioStore((s) => s.getActivePortfolio());
+  const portfolio = usePortfolioStore(selectActivePortfolio);
 
   const stats = useMemo(() => {
     if (!portfolio) return null;

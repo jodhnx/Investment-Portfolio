@@ -44,9 +44,10 @@ const TIMEZONES = [
 
 export default function OnboardingPage() {
   const profile = usePortfolioStore((s) => s.profile);
+  const hydrated = usePortfolioStore((s) => s.hydrated);
+  const profileId = profile?.id;
   const [step, setStep] = useState(1);
   const [loading, setLoading] = useState(false);
-  const [initLoading, setInitLoading] = useState(true);
   const [form, setForm] = useState({
     name: "",
     currency: "EUR",
@@ -55,50 +56,21 @@ export default function OnboardingPage() {
     timezone: "Europe/Berlin",
   });
 
+  // Formular aus Profil befüllen – nur wenn sich die Profil-ID ändert
   useEffect(() => {
-    let cancelled = false;
-
-    async function init() {
-      try {
-        const supabase = createClient();
-        const {
-          data: { user },
-        } = await supabase.auth.getUser();
-        if (user && !cancelled) {
-          await syncProfileFromUser(supabase, user);
-        }
-        if (!cancelled) {
-          await usePortfolioStore.getState().hydrate();
-        }
-      } catch (err) {
-        logAuthError("onboarding:init", err);
-        if (!cancelled) toast.error("Profil konnte nicht geladen werden.");
-      } finally {
-        if (!cancelled) setInitLoading(false);
-      }
-    }
-
-    init();
-    return () => {
-      cancelled = true;
-    };
-  }, []);
-
-  useEffect(() => {
-    if (profile) {
-      setForm((f) => ({
-        ...f,
-        name: profile.name ?? f.name,
-        currency: profile.currency ?? f.currency,
-        country: profile.country ?? f.country,
-        language: profile.language ?? f.language,
-        timezone: profile.timezone ?? f.timezone,
-      }));
-    }
-  }, [profile]);
+    if (!profileId) return;
+    setForm((f) => ({
+      ...f,
+      name: profile.name ?? f.name,
+      currency: profile.currency ?? f.currency,
+      country: profile.country ?? f.country,
+      language: profile.language ?? f.language,
+      timezone: profile.timezone ?? f.timezone,
+    }));
+  }, [profileId, profile?.name, profile?.currency, profile?.country, profile?.language, profile?.timezone]);
 
   const ensureProfile = async (): Promise<string | null> => {
-    if (profile?.id) return profile.id;
+    if (profileId) return profileId;
 
     const supabase = createClient();
     const {
@@ -108,8 +80,7 @@ export default function OnboardingPage() {
 
     await syncProfileFromUser(supabase, user);
     await usePortfolioStore.getState().hydrate();
-
-    return usePortfolioStore.getState().profile?.id ?? null;
+    return usePortfolioStore.getState().profileId;
   };
 
   const handleFinish = async () => {
@@ -117,19 +88,18 @@ export default function OnboardingPage() {
 
     setLoading(true);
     try {
-      const profileId = await ensureProfile();
-      if (!profileId) {
+      const id = await ensureProfile();
+      if (!id) {
         toast.error("Profil konnte nicht erstellt werden. Bitte Seite neu laden.");
         return;
       }
 
-      const success = await completeOnboarding(profileId, form);
+      const success = await completeOnboarding(id, form);
       if (!success) {
         toast.error("Onboarding fehlgeschlagen. Bitte erneut versuchen.");
         return;
       }
 
-      await usePortfolioStore.getState().hydrate();
       toast.success(`Willkommen, ${form.name}!`);
       window.location.assign("/");
     } catch (err) {
@@ -140,7 +110,7 @@ export default function OnboardingPage() {
     }
   };
 
-  if (initLoading) {
+  if (!hydrated) {
     return (
       <AuthLayout title="Willkommen bei InvestTrack" subtitle="Profil wird vorbereitet…">
         <div className="flex justify-center py-8">

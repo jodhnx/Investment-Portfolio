@@ -37,14 +37,14 @@ export default function RootLayout({
     >
       <body className="min-h-full flex flex-col">
         <TooltipProvider>
-          <ThemeProvider>
-            <AuthProvider>
-              <Suspense>
-                <StoreHydrator>{children}</StoreHydrator>
-              </Suspense>
-              <Toaster richColors position="bottom-right" />
-            </AuthProvider>
-          </ThemeProvider>
+          <AuthProvider>
+            <StoreHydrator>
+              <ThemeProvider>
+                <Suspense>{children}</Suspense>
+                <Toaster richColors position="bottom-right" />
+              </ThemeProvider>
+            </StoreHydrator>
+          </AuthProvider>
         </TooltipProvider>
       </body>
     </html>

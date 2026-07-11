@@ -5,11 +5,12 @@ import { Download, Upload, FileText } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { usePortfolioStore } from "@/store/portfolio-store";
+import { selectActivePortfolio } from "@/lib/store-selectors";
 import { exportToCSV, parseCSVImport } from "@/lib/storage";
 import { toast } from "sonner";
 
 export default function ImportExportPage() {
-  const portfolio = usePortfolioStore((s) => s.getActivePortfolio());
+  const portfolio = usePortfolioStore(selectActivePortfolio);
   const importPositions = usePortfolioStore((s) => s.importPositions);
   const fileRef = useRef<HTMLInputElement>(null);
 

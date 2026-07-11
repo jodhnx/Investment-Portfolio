@@ -18,9 +18,10 @@ import {
   formatCurrency,
 } from "@/lib/calculations";
 import { usePortfolioStore } from "@/store/portfolio-store";
+import { selectActivePortfolio } from "@/lib/store-selectors";
 
 export default function DividendsPage() {
-  const portfolio = usePortfolioStore((s) => s.getActivePortfolio());
+  const portfolio = usePortfolioStore(selectActivePortfolio);
   const addDividend = usePortfolioStore((s) => s.addDividend);
   const [positionId, setPositionId] = useState("");
   const [amount, setAmount] = useState("");

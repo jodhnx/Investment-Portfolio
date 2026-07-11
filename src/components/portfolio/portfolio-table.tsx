@@ -43,6 +43,7 @@ import {
 import type { ComputedPosition } from "@/lib/types";
 import { assetTypeLabel } from "@/hooks/use-price-updater";
 import { cn } from "@/lib/utils";
+import { selectActivePortfolio } from "@/lib/store-selectors";
 import { usePortfolioStore } from "@/store/portfolio-store";
 import { AddAssetDialog } from "./add-asset-dialog";
 import { TransactionDialog } from "./transaction-dialog";
@@ -216,7 +217,7 @@ interface PortfolioTableProps {
 }
 
 export function PortfolioTable({ watchlistOnly = false }: PortfolioTableProps) {
-  const portfolio = usePortfolioStore((s) => s.getActivePortfolio());
+  const portfolio = usePortfolioStore(selectActivePortfolio);
   const deletePosition = usePortfolioStore((s) => s.deletePosition);
   const [sorting, setSorting] = useState<SortingState>([]);
   const [globalFilter, setGlobalFilter] = useState("");

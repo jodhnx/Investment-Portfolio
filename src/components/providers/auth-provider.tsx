@@ -1,9 +1,15 @@
 "use client";
 
-import { createContext, useContext, useEffect, useState, useCallback, useMemo, useRef } from "react";
+import {
+  createContext,
+  useContext,
+  useEffect,
+  useState,
+  useCallback,
+  useMemo,
+} from "react";
 import type { User, Session } from "@supabase/supabase-js";
 import { createClient, resetBrowserClient } from "@/lib/supabase/client";
-import { syncProfileFromUser } from "@/lib/auth/profile-sync";
 import { usePortfolioStore } from "@/store/portfolio-store";
 import { logAuthDebug, logAuthError } from "@/lib/auth/logger";
 
@@ -23,12 +29,16 @@ const AuthContext = createContext<AuthContextValue>({
   refreshSession: async () => {},
 });
 
+function sameUser(a: User | null, b: User | null): boolean {
+  if (a === b) return true;
+  if (!a || !b) return false;
+  return a.id === b.id;
+}
+
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [session, setSession] = useState<Session | null>(null);
   const [loading, setLoading] = useState(true);
-  const reset = usePortfolioStore((s) => s.reset);
-  const listenerRegistered = useRef(false);
 
   const refreshSession = useCallback(async () => {
     try {
@@ -39,57 +49,38 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       } = await supabase.auth.getSession();
       if (error) logAuthError("refreshSession", error);
       setSession(s);
-      setUser(s?.user ?? null);
+      setUser((prev) => {
+        const next = s?.user ?? null;
+        return sameUser(prev, next) ? prev : next;
+      });
     } catch (err) {
       logAuthError("refreshSession:unexpected", err);
     }
   }, []);
 
   useEffect(() => {
-    if (listenerRegistered.current) return;
-    listenerRegistered.current = true;
-
     const supabase = createClient();
-
-    supabase.auth.getSession().then(({ data: { session: s }, error }) => {
-      if (error) logAuthError("initSession", error);
-      setSession(s);
-      setUser(s?.user ?? null);
-      setLoading(false);
-      logAuthDebug("initSession", { hasSession: !!s, userId: s?.user?.id });
-    });
 
     const {
       data: { subscription },
     } = supabase.auth.onAuthStateChange((event, s) => {
       logAuthDebug("authStateChange", { event, userId: s?.user?.id });
 
-      setSession(s);
-      setUser(s?.user ?? null);
+      setSession((prev) => (prev?.access_token === s?.access_token ? prev : s));
+      setUser((prev) => {
+        const next = s?.user ?? null;
+        return sameUser(prev, next) ? prev : next;
+      });
       setLoading(false);
 
-      // Async-Arbeit außerhalb des Callbacks (Supabase Best Practice)
-      if (event === "SIGNED_IN" && s?.user?.email_confirmed_at) {
-        queueMicrotask(async () => {
-          try {
-            await syncProfileFromUser(supabase, s.user);
-          } catch (err) {
-            logAuthError("authStateChange:profile", err);
-          }
-        });
-      }
-
       if (event === "SIGNED_OUT") {
-        reset();
+        usePortfolioStore.getState().reset();
         resetBrowserClient();
       }
     });
 
-    return () => {
-      listenerRegistered.current = false;
-      subscription.unsubscribe();
-    };
-  }, [reset]);
+    return () => subscription.unsubscribe();
+  }, []);
 
   const signOut = useCallback(async () => {
     try {
@@ -101,9 +92,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
     setUser(null);
     setSession(null);
-    reset();
+    usePortfolioStore.getState().reset();
     resetBrowserClient();
-  }, [reset]);
+  }, []);
 
   const value = useMemo(
     () => ({ user, session, loading, signOut, refreshSession }),

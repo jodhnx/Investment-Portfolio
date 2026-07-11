@@ -6,6 +6,7 @@ import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
 import { Sidebar } from "./sidebar";
 import { useTheme } from "@/components/providers/theme-provider";
 import { useAuth } from "@/components/providers/auth-provider";
+import { selectActivePortfolio } from "@/lib/store-selectors";
 import { usePortfolioStore } from "@/store/portfolio-store";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { toast } from "sonner";
@@ -13,9 +14,7 @@ import { toast } from "sonner";
 export function Header() {
   const { theme, toggleTheme } = useTheme();
   const { signOut } = useAuth();
-  const portfolio = usePortfolioStore((s) =>
-    s.portfolios.find((p) => p.id === s.activePortfolioId)
-  );
+  const portfolio = usePortfolioStore(selectActivePortfolio);
   const profile = usePortfolioStore((s) => s.profile);
 
   const handleRefreshPrices = async () => {

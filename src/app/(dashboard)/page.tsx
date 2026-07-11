@@ -2,18 +2,20 @@
 
 import Link from "next/link";
 import { usePortfolioStore } from "@/store/portfolio-store";
+import {
+  selectActivePortfolio,
+  selectProfile,
+  selectSnapshotsForActivePortfolio,
+} from "@/lib/store-selectors";
 import { StatsCards } from "@/components/dashboard/stats-cards";
 import { PortfolioChart } from "@/components/dashboard/portfolio-chart";
 import { AllocationChart } from "@/components/dashboard/allocation-chart";
 import { computePortfolioStats } from "@/lib/calculations";
 
 export default function DashboardPage() {
-  const portfolio = usePortfolioStore((s) =>
-    s.portfolios.find((p) => p.id === s.activePortfolioId)
-  );
-  const activePortfolioId = usePortfolioStore((s) => s.activePortfolioId);
-  const snapshots = usePortfolioStore((s) => s.snapshots[activePortfolioId] ?? []);
-  const profile = usePortfolioStore((s) => s.profile);
+  const portfolio = usePortfolioStore(selectActivePortfolio);
+  const snapshots = usePortfolioStore(selectSnapshotsForActivePortfolio);
+  const profile = usePortfolioStore(selectProfile);
 
   if (!portfolio) {
     return (

@@ -18,6 +18,7 @@ import type {
 import type { Profile } from "@/lib/supabase/database.types";
 import { generateSnapshot } from "@/lib/calculations";
 import { loadUserData } from "@/lib/supabase/queries";
+import { createClient } from "@/lib/supabase/client";
 import {
   syncAssetDelete,
   syncAssetInsert,
@@ -38,6 +39,7 @@ import { positionFromSearch } from "@/lib/storage";
 const MAX_HISTORY = 50;
 
 let hydrateInFlight: Promise<void> | null = null;
+let lastHydratedUserId: string | null = null;
 
 const emptyState: AppState = {
   portfolios: [],
@@ -48,7 +50,7 @@ const emptyState: AppState = {
   historyIndex: -1,
 };
 
-interface PortfolioStore extends AppState {
+export interface PortfolioStore extends AppState {
   hydrated: boolean;
   profile: Profile | null;
   profileId: string | null;
@@ -108,11 +110,34 @@ export const usePortfolioStore = create<PortfolioStore>()(
 
       hydrateInFlight = (async () => {
         try {
-          const data = await loadUserData();
-          if (!data) {
+          const supabase = createClient();
+          const {
+            data: { user },
+          } = await supabase.auth.getUser();
+
+          if (!user) {
+            lastHydratedUserId = null;
             set({ ...emptyState, hydrated: true, profile: null, profileId: null });
             return;
           }
+
+          const current = get();
+          if (
+            lastHydratedUserId === user.id &&
+            current.hydrated &&
+            current.profile?.auth_user_id === user.id
+          ) {
+            return;
+          }
+
+          const data = await loadUserData();
+          if (!data) {
+            lastHydratedUserId = user.id;
+            set({ ...emptyState, hydrated: true, profile: null, profileId: null });
+            return;
+          }
+
+          lastHydratedUserId = user.id;
           set({
             portfolios: data.portfolios,
             activePortfolioId: data.portfolios[0]?.id ?? "",
@@ -137,7 +162,10 @@ export const usePortfolioStore = create<PortfolioStore>()(
       }
     },
 
-    reset: () => set({ ...emptyState, hydrated: false, profile: null, profileId: null }),
+    reset: () => {
+      lastHydratedUserId = null;
+      set({ ...emptyState, hydrated: false, profile: null, profileId: null });
+    },
 
     pushHistory: () => {
       const { portfolios, activePortfolioId, snapshots, settings } = get();
