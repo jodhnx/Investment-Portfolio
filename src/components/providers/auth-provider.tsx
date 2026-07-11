@@ -3,6 +3,7 @@
 import { createContext, useContext, useEffect, useState, useCallback } from "react";
 import type { User, Session } from "@supabase/supabase-js";
 import { createClient, resetBrowserClient } from "@/lib/supabase/client";
+import { syncProfileFromUser } from "@/lib/auth/profile-sync";
 import { usePortfolioStore } from "@/store/portfolio-store";
 import { logAuthDebug, logAuthError } from "@/lib/auth/logger";
 
@@ -64,6 +65,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       setLoading(false);
 
       if (event === "SIGNED_IN" && s?.user?.email_confirmed_at) {
+        const supabase = createClient();
+        await syncProfileFromUser(supabase, s.user);
         await hydrate();
       }
       if (event === "SIGNED_OUT") {

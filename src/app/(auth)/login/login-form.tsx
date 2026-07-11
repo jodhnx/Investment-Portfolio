@@ -6,6 +6,10 @@ import { Loader2 } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { mapAuthError, getAuthErrorMessage } from "@/lib/auth/errors";
 import { logAuthError, logAuthDebug } from "@/lib/auth/logger";
+import {
+  navigateAfterLogin,
+  resolvePostLoginDestination,
+} from "@/lib/auth/post-login";
 import { validateEmail } from "@/lib/auth/validation";
 import { AuthLayout, AuthLink } from "@/components/auth/auth-layout";
 import { FormField, PasswordField } from "@/components/auth/form-fields";
@@ -157,9 +161,14 @@ export function LoginForm() {
       clearAttempts();
       logAuthDebug("login:success", { userId: data.user?.id });
 
+      const { path } = await resolvePostLoginDestination(
+        supabase,
+        data.user,
+        redirect
+      );
+
       toast.success("Erfolgreich angemeldet!");
-      router.push(redirect);
-      router.refresh();
+      navigateAfterLogin(path);
     } catch (err) {
       logAuthError("login:unexpected", err);
       const msg = "Keine Internetverbindung oder Serverfehler.";

@@ -66,8 +66,7 @@ export default function ResetPasswordPage() {
       }
 
       toast.success("Passwort erfolgreich geändert!");
-      router.push("/");
-      router.refresh();
+      window.location.assign("/");
     } catch (err) {
       logAuthError("reset-password:unexpected", err);
       const msg = "Verbindungsfehler. Bitte prüfe deine Internetverbindung.";

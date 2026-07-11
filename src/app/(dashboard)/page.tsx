@@ -1,10 +1,11 @@
 "use client";
 
+import Link from "next/link";
+import { usePortfolioStore } from "@/store/portfolio-store";
 import { StatsCards } from "@/components/dashboard/stats-cards";
 import { PortfolioChart } from "@/components/dashboard/portfolio-chart";
 import { AllocationChart } from "@/components/dashboard/allocation-chart";
 import { computePortfolioStats } from "@/lib/calculations";
-import { usePortfolioStore } from "@/store/portfolio-store";
 import { usePriceUpdater } from "@/hooks/use-price-updater";
 
 export default function DashboardPage() {
@@ -12,8 +13,24 @@ export default function DashboardPage() {
   const portfolio = usePortfolioStore((s) => s.getActivePortfolio());
   const activePortfolioId = usePortfolioStore((s) => s.activePortfolioId);
   const snapshots = usePortfolioStore((s) => s.snapshots[activePortfolioId] ?? []);
+  const profile = usePortfolioStore((s) => s.profile);
 
-  if (!portfolio) return null;
+  if (!portfolio) {
+    return (
+      <div className="flex flex-col items-center justify-center gap-4 py-16 text-center">
+        <h2 className="text-xl font-semibold">Willkommen{profile?.name ? `, ${profile.name}` : ""}!</h2>
+        <p className="max-w-md text-sm text-muted-foreground">
+          Dein Portfolio ist noch leer. Schließe das Onboarding ab oder lege dein erstes Portfolio an.
+        </p>
+        <Link
+          href="/onboarding"
+          className="inline-flex h-9 items-center justify-center rounded-md bg-primary px-4 text-sm font-medium text-primary-foreground hover:bg-primary/90"
+        >
+          Onboarding fortsetzen
+        </Link>
+      </div>
+    );
+  }
 
   const stats = computePortfolioStats(portfolio);
 

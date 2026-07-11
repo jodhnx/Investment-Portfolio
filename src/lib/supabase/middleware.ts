@@ -77,11 +77,15 @@ export async function updateSession(request: NextRequest) {
       });
     }
 
-    const { data: profileData } = await supabase
+    const { data: profileData, error: profileQueryError } = await supabase
       .from("profiles")
       .select("onboarding_complete")
       .eq("auth_user_id", user.id)
       .maybeSingle();
+
+    if (profileQueryError) {
+      console.error("[Auth:middleware] profile query failed:", profileQueryError.message);
+    }
 
     const profile = asProfile(profileData);
     const needsOnboarding =

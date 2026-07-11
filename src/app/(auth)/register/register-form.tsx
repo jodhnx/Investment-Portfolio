@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { useRouter } from "next/navigation";
+import { navigateAfterLogin, resolvePostLoginDestination } from "@/lib/auth/post-login";
 import { Loader2 } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { getAuthCallbackUrl } from "@/lib/auth/url";
@@ -22,7 +22,6 @@ import { OAuthButtons } from "@/components/auth/oauth-buttons";
 import { toast } from "sonner";
 
 export function RegisterForm() {
-  const router = useRouter();
   const [firstName, setFirstName] = useState("");
   const [lastName, setLastName] = useState("");
   const [username, setUsername] = useState("");
@@ -111,14 +110,14 @@ export function RegisterForm() {
           description: `Prüfe dein Postfach (${email.trim()}). Der Link führt zu ${callbackUrl}`,
           duration: 8000,
         });
-        router.push(`/verify-email?email=${encodeURIComponent(email.trim())}`);
+        window.location.assign(`/verify-email?email=${encodeURIComponent(email.trim())}`);
         return;
       }
 
       // Bestätigung deaktiviert → direkt weiter
+      const { path } = await resolvePostLoginDestination(supabase, data.user, "/onboarding");
       toast.success("Konto erstellt!");
-      router.push("/onboarding");
-      router.refresh();
+      navigateAfterLogin(path);
     } catch (err) {
       logAuthError("register:unexpected", err);
       const msg = "Verbindungsfehler. Bitte prüfe deine Internetverbindung.";

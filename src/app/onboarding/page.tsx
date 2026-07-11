@@ -1,10 +1,12 @@
 "use client";
 
-import { useState, useEffect } from "react";
-import { useRouter } from "next/navigation";
+import { useEffect, useState } from "react";
 import { Loader2 } from "lucide-react";
+import { createClient } from "@/lib/supabase/client";
+import { syncProfileFromUser } from "@/lib/auth/profile-sync";
 import { completeOnboarding } from "@/lib/supabase/queries";
 import { usePortfolioStore } from "@/store/portfolio-store";
+import { logAuthError } from "@/lib/auth/logger";
 import { AuthLayout } from "@/components/auth/auth-layout";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -41,11 +43,11 @@ const TIMEZONES = [
 ];
 
 export default function OnboardingPage() {
-  const router = useRouter();
   const profile = usePortfolioStore((s) => s.profile);
   const hydrate = usePortfolioStore((s) => s.hydrate);
   const [step, setStep] = useState(1);
   const [loading, setLoading] = useState(false);
+  const [initLoading, setInitLoading] = useState(true);
   const [form, setForm] = useState({
     name: "",
     currency: "EUR",
@@ -55,7 +57,24 @@ export default function OnboardingPage() {
   });
 
   useEffect(() => {
-    hydrate();
+    async function init() {
+      try {
+        const supabase = createClient();
+        const {
+          data: { user },
+        } = await supabase.auth.getUser();
+        if (user) {
+          await syncProfileFromUser(supabase, user);
+        }
+        await hydrate();
+      } catch (err) {
+        logAuthError("onboarding:init", err);
+        toast.error("Profil konnte nicht geladen werden.");
+      } finally {
+        setInitLoading(false);
+      }
+    }
+    init();
   }, [hydrate]);
 
   useEffect(() => {
@@ -71,23 +90,58 @@ export default function OnboardingPage() {
     }
   }, [profile]);
 
+  const ensureProfile = async (): Promise<string | null> => {
+    if (profile?.id) return profile.id;
+
+    const supabase = createClient();
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
+    if (!user) return null;
+
+    await syncProfileFromUser(supabase, user);
+    await hydrate();
+
+    return usePortfolioStore.getState().profile?.id ?? null;
+  };
+
   const handleFinish = async () => {
     if (!form.name.trim()) return toast.error("Bitte gib deinen Namen ein.");
-    if (!profile?.id) return toast.error("Profil nicht gefunden.");
 
     setLoading(true);
-    const success = await completeOnboarding(profile.id, form);
-    if (!success) {
+    try {
+      const profileId = await ensureProfile();
+      if (!profileId) {
+        toast.error("Profil konnte nicht erstellt werden. Bitte Seite neu laden.");
+        return;
+      }
+
+      const success = await completeOnboarding(profileId, form);
+      if (!success) {
+        toast.error("Onboarding fehlgeschlagen. Bitte erneut versuchen.");
+        return;
+      }
+
+      await hydrate();
+      toast.success(`Willkommen, ${form.name}!`);
+      window.location.assign("/");
+    } catch (err) {
+      logAuthError("onboarding:finish", err);
+      toast.error("Ein Fehler ist aufgetreten. Bitte erneut versuchen.");
+    } finally {
       setLoading(false);
-      toast.error("Onboarding fehlgeschlagen. Bitte erneut versuchen.");
-      return;
     }
-    await hydrate();
-    setLoading(false);
-    toast.success(`Willkommen, ${form.name}!`);
-    router.push("/");
-    router.refresh();
   };
+
+  if (initLoading) {
+    return (
+      <AuthLayout title="Willkommen bei InvestTrack" subtitle="Profil wird vorbereitet…">
+        <div className="flex justify-center py-8">
+          <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+        </div>
+      </AuthLayout>
+    );
+  }
 
   return (
     <AuthLayout

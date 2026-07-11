@@ -1,4 +1,6 @@
 import { createClient } from "@/lib/supabase/client";
+import { syncProfileFromUser } from "@/lib/auth/profile-sync";
+import { logAuthError } from "@/lib/auth/logger";
 import type { Profile } from "@/lib/supabase/database.types";
 import type { AppSettings, Portfolio, PortfolioSnapshot } from "@/lib/types";
 import {
@@ -25,13 +27,31 @@ export async function loadUserData(): Promise<LoadedUserData | null> {
   } = await supabase.auth.getUser();
   if (!user) return null;
 
-  const { data: profile, error: profileError } = await supabase
+  let { data: profile, error: profileError } = await supabase
     .from("profiles")
     .select("*")
     .eq("auth_user_id", user.id)
-    .single();
+    .maybeSingle();
 
-  if (profileError || !profile) return null;
+  if (!profile) {
+    await syncProfileFromUser(supabase, user);
+    const retry = await supabase
+      .from("profiles")
+      .select("*")
+      .eq("auth_user_id", user.id)
+      .maybeSingle();
+    profile = retry.data;
+    profileError = retry.error;
+  }
+
+  if (profileError) {
+    logAuthError("loadUserData:profile", profileError);
+  }
+
+  if (!profile) {
+    logAuthError("loadUserData:profile", "Profil konnte nicht geladen oder erstellt werden");
+    return null;
+  }
 
   const profileRow = profile as Profile;
 

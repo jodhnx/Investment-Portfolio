@@ -57,6 +57,11 @@ export async function syncProfileFromUser(
   });
 
   if (insertError) {
+    // Profil existiert bereits (Trigger oder paralleler Request)
+    if (insertError.code === "23505") {
+      logAuthDebug("profile:insert:duplicate", { userId: user.id });
+      return { error: null };
+    }
     logAuthError("profile:insert", insertError);
     return { error: insertError.message };
   }
