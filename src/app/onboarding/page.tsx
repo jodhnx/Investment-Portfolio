@@ -1,5 +1,6 @@
 "use client";
 
+import { APP_NAME } from "@/config/brand";
 import { useEffect, useState } from "react";
 import { Loader2 } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
@@ -112,7 +113,7 @@ export default function OnboardingPage() {
 
   if (!hydrated) {
     return (
-      <AuthLayout title="Willkommen bei InvestTrack" subtitle="Profil wird vorbereitet…">
+      <AuthLayout title={`Willkommen bei ${APP_NAME}`} subtitle="Profil wird vorbereitet…">
         <div className="flex justify-center py-8">
           <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
         </div>
@@ -122,7 +123,7 @@ export default function OnboardingPage() {
 
   return (
     <AuthLayout
-      title="Willkommen bei InvestTrack"
+      title={`Willkommen bei ${APP_NAME}`}
       subtitle={`Schritt ${step} von 2 – Profil einrichten`}
     >
       {step === 1 && (

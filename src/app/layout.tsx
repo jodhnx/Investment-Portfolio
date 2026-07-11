@@ -6,6 +6,7 @@ import { ThemeProvider } from "@/components/providers/theme-provider";
 import { AuthProvider } from "@/components/providers/auth-provider";
 import { StoreHydrator } from "@/components/providers/store-hydrator";
 import { Toaster } from "@/components/ui/sonner";
+import { APP_DESCRIPTION, APP_NAME, APP_TAGLINE } from "@/config/brand";
 import "./globals.css";
 
 const geistSans = Geist({
@@ -19,14 +20,13 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "InvestTrack – Portfolio & Investment Tracker",
-  description:
-    "Professioneller Investment-Portfolio-Tracker für Krypto, Aktien, ETFs, Gold und individuelle Assets",
-  applicationName: "InvestTrack",
+  title: `${APP_NAME} – ${APP_TAGLINE}`,
+  description: APP_DESCRIPTION,
+  applicationName: APP_NAME,
   appleWebApp: {
     capable: true,
     statusBarStyle: "black-translucent",
-    title: "InvestTrack",
+    title: APP_NAME,
   },
   formatDetection: {
     telephone: false,
@@ -37,8 +37,11 @@ export const metadata: Metadata = {
     "mobile-web-app-capable": "yes",
   },
   icons: {
-    icon: [{ url: "/icons/icon.svg", type: "image/svg+xml" }],
-    apple: [{ url: "/icons/icon.svg", type: "image/svg+xml" }],
+    icon: [
+      { url: "/icons/icon.png", sizes: "512x512", type: "image/png" },
+      { url: "/icons/icon.svg", type: "image/svg+xml" },
+    ],
+    apple: [{ url: "/icons/icon.png", sizes: "512x512", type: "image/png" }],
   },
 };
 
@@ -49,8 +52,8 @@ export const viewport: Viewport = {
   userScalable: false,
   viewportFit: "cover",
   themeColor: [
-    { media: "(prefers-color-scheme: light)", color: "#ffffff" },
-    { media: "(prefers-color-scheme: dark)", color: "#0a0a0a" },
+    { media: "(prefers-color-scheme: light)", color: "#f8fafc" },
+    { media: "(prefers-color-scheme: dark)", color: "#111827" },
   ],
 };
 
@@ -71,7 +74,7 @@ export default function RootLayout({
             <StoreHydrator>
               <ThemeProvider>
                 <Suspense>{children}</Suspense>
-                <Toaster richColors position="bottom-right" />
+                <Toaster position="bottom-center" />
               </ThemeProvider>
             </StoreHydrator>
           </AuthProvider>

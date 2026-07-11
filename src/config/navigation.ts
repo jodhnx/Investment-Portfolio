@@ -42,5 +42,5 @@ export function getPageTitle(pathname: string): string {
   if (exact) return exact.label;
   if (pathname.startsWith("/assets/")) return "Asset Details";
   if (pathname.startsWith("/capital")) return "Kapital";
-  return "InvestTrack";
+  return "Velo";
 }

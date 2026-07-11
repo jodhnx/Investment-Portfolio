@@ -15,35 +15,32 @@ export function BottomNav() {
 
   return (
     <nav
-      className="fixed inset-x-0 bottom-0 z-50 border-t border-border bg-background/95 pb-[env(safe-area-inset-bottom)] backdrop-blur-md md:hidden"
-      aria-label="Hauptnavigation"
+      className="fixed inset-x-0 bottom-0 z-50 border-t border-border bg-background pb-[env(safe-area-inset-bottom)] md:hidden"
+      aria-label="Navigation"
     >
-      <div className="flex h-16 items-stretch justify-around px-1">
+      <div className="flex h-14 items-stretch">
         {MOBILE_BOTTOM_NAV.slice(0, 4).map(({ href, label, icon: Icon }) => {
-          const active = pathname === href;
+          const active = pathname === href || (href !== "/" && pathname.startsWith(href));
           return (
             <Link
               key={href}
               href={href}
               className={cn(
-                "flex min-w-0 flex-1 flex-col items-center justify-center gap-0.5 px-1 text-[10px] font-medium transition-colors",
+                "flex flex-1 flex-col items-center justify-center gap-0.5 text-[10px]",
                 active ? "text-primary" : "text-muted-foreground"
               )}
             >
-              <Icon className={cn("h-5 w-5", active && "scale-110")} />
-              <span className="truncate">{label.split(" ")[0]}</span>
+              <Icon className="h-5 w-5" />
+              <span>{label.split(" ")[0]}</span>
             </Link>
           );
         })}
         <Sheet open={menuOpen} onOpenChange={setMenuOpen}>
-          <SheetTrigger
-            className="flex min-w-0 flex-1 flex-col items-center justify-center gap-0.5 px-1 text-[10px] font-medium text-muted-foreground"
-            aria-label="Menü öffnen"
-          >
+          <SheetTrigger className="flex flex-1 flex-col items-center justify-center gap-0.5 text-[10px] text-muted-foreground">
             <Menu className="h-5 w-5" />
             <span>Mehr</span>
           </SheetTrigger>
-          <SheetContent side="left" className="w-[min(100vw-2rem,20rem)] p-0">
+          <SheetContent side="left" className="w-72 p-0">
             <NavContent onNavigate={() => setMenuOpen(false)} showBrand />
           </SheetContent>
         </Sheet>

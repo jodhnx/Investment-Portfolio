@@ -2,12 +2,12 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { TrendingUp, Undo2, Redo2, Plus } from "lucide-react";
+import { Undo2, Redo2, Plus } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { MAIN_NAV } from "@/config/navigation";
+import { AppLogo } from "@/components/brand/app-logo";
 import { usePortfolioStore } from "@/store/portfolio-store";
 import { Button } from "@/components/ui/button";
-import { Separator } from "@/components/ui/separator";
 import {
   Select,
   SelectContent,
@@ -33,25 +33,20 @@ export function NavContent({ onNavigate, showBrand = true }: NavContentProps) {
   return (
     <div className="flex h-full flex-col">
       {showBrand && (
-        <div className="flex h-14 items-center gap-2 border-b border-border px-4">
-          <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-primary/15">
-            <TrendingUp className="h-4 w-4 text-primary" />
-          </div>
-          <span className="text-base font-semibold tracking-tight">InvestTrack</span>
+        <div className="border-b border-border px-4 py-4">
+          <AppLogo size="sm" />
         </div>
       )}
 
-      <div className="p-4">
-        <label className="mb-1.5 block text-xs font-medium text-muted-foreground">
-          Portfolio
-        </label>
+      <div className="p-3">
+        <label className="mb-1 block text-xs text-muted-foreground">Portfolio</label>
         {portfolios.length > 0 ? (
           <Select
             value={activePortfolioId || undefined}
             onValueChange={(v) => v && setActivePortfolio(v)}
           >
-            <SelectTrigger className="h-10 w-full">
-              <SelectValue placeholder="Portfolio wählen" />
+            <SelectTrigger className="h-9 w-full">
+              <SelectValue placeholder="Wählen" />
             </SelectTrigger>
             <SelectContent>
               {portfolios.map((p) => (
@@ -62,52 +57,50 @@ export function NavContent({ onNavigate, showBrand = true }: NavContentProps) {
             </SelectContent>
           </Select>
         ) : (
-          <p className="text-xs text-muted-foreground">Noch kein Portfolio</p>
+          <p className="text-xs text-muted-foreground">Noch leer</p>
         )}
         <Button
           variant="outline"
           size="sm"
-          className="mt-2 h-10 w-full"
+          className="mt-2 h-9 w-full text-xs"
           onClick={() => {
-            const name = prompt("Name des neuen Portfolios:");
+            const name = prompt("Portfolio-Name:");
             if (name) addPortfolio(name);
           }}
         >
-          <Plus className="mr-1.5 h-4 w-4" />
-          Neues Portfolio
+          <Plus className="mr-1 h-3.5 w-3.5" />
+          Neu
         </Button>
       </div>
 
-      <Separator />
-
-      <nav className="flex-1 space-y-0.5 overflow-y-auto p-3">
+      <nav className="flex-1 space-y-0.5 overflow-y-auto px-2 py-1">
         {MAIN_NAV.map(({ href, label, icon: Icon }) => {
-          const active = pathname === href;
+          const active = pathname === href || (href !== "/" && pathname.startsWith(href));
           return (
             <Link
               key={href}
               href={href}
               onClick={onNavigate}
               className={cn(
-                "flex min-h-11 items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium transition-colors",
+                "flex h-10 items-center gap-2.5 rounded-lg px-3 text-sm",
                 active
-                  ? "bg-primary text-primary-foreground shadow-sm"
-                  : "text-muted-foreground hover:bg-accent hover:text-accent-foreground"
+                  ? "bg-primary/10 font-medium text-primary"
+                  : "text-muted-foreground hover:bg-muted hover:text-foreground"
               )}
             >
-              <Icon className="h-5 w-5 shrink-0" />
+              <Icon className="h-4 w-4 shrink-0" />
               {label}
             </Link>
           );
         })}
       </nav>
 
-      <div className="border-t border-border p-3">
-        <div className="flex gap-2">
-          <Button variant="outline" size="sm" className="h-10 flex-1" onClick={undo}>
+      <div className="border-t border-border p-2">
+        <div className="flex gap-1">
+          <Button variant="ghost" size="sm" className="h-9 flex-1" onClick={undo}>
             <Undo2 className="h-4 w-4" />
           </Button>
-          <Button variant="outline" size="sm" className="h-10 flex-1" onClick={redo}>
+          <Button variant="ghost" size="sm" className="h-9 flex-1" onClick={redo}>
             <Redo2 className="h-4 w-4" />
           </Button>
         </div>
