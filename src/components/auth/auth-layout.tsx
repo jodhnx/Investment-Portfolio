@@ -14,11 +14,11 @@ export function AuthLayout({
 }) {
   return (
     <div className="flex min-h-screen flex-col items-center justify-center bg-background p-4">
-      <div className="mb-8 flex items-center gap-2">
+      <div className="mb-8 flex items-center gap-2 animate-in fade-in slide-in-from-top-2 duration-500">
         <TrendingUp className="h-8 w-8 text-primary" />
         <span className="text-2xl font-bold tracking-tight">InvestTrack</span>
       </div>
-      <div className="w-full max-w-md space-y-6 rounded-xl border border-border bg-card p-8 shadow-lg">
+      <div className="w-full max-w-md space-y-6 rounded-xl border border-border bg-card p-8 shadow-lg animate-in fade-in slide-in-from-bottom-4 duration-500">
         <div className="space-y-1 text-center">
           <h1 className="text-2xl font-bold tracking-tight">{title}</h1>
           {subtitle && (
@@ -27,7 +27,7 @@ export function AuthLayout({
         </div>
         {children}
       </div>
-      <p className="mt-6 text-xs text-muted-foreground">
+      <p className="mt-6 text-xs text-muted-foreground animate-in fade-in duration-700">
         Sichere Authentifizierung mit Supabase
       </p>
     </div>

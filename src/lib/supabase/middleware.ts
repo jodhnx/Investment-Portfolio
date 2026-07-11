@@ -9,6 +9,15 @@ const PUBLIC_ROUTES = [
   "/reset-password",
   "/verify-email",
   "/auth/callback",
+  "/auth/error",
+];
+
+const UNCONFIRMED_ALLOWED = [
+  "/verify-email",
+  "/auth/callback",
+  "/auth/error",
+  "/login",
+  "/register",
 ];
 
 export async function updateSession(request: NextRequest) {
@@ -39,6 +48,7 @@ export async function updateSession(request: NextRequest) {
     }
   );
 
+  // Session refreshen – hält Login beim Seiten-Reload
   const {
     data: { user },
   } = await supabase.auth.getUser();
@@ -55,6 +65,15 @@ export async function updateSession(request: NextRequest) {
   }
 
   if (user) {
+    const emailConfirmed = !!user.email_confirmed_at;
+
+    if (!emailConfirmed && !UNCONFIRMED_ALLOWED.some((r) => pathname.startsWith(r))) {
+      const url = request.nextUrl.clone();
+      url.pathname = "/verify-email";
+      if (user.email) url.searchParams.set("email", user.email);
+      return NextResponse.redirect(url);
+    }
+
     const { data: profileData } = await supabase
       .from("profiles")
       .select("onboarding_complete")
@@ -62,7 +81,7 @@ export async function updateSession(request: NextRequest) {
       .single();
 
     const profile = asProfile(profileData);
-    const needsOnboarding = profile && !profile.onboarding_complete;
+    const needsOnboarding = emailConfirmed && profile && !profile.onboarding_complete;
 
     if (needsOnboarding && !isOnboarding && !isPublic) {
       const url = request.nextUrl.clone();
@@ -76,13 +95,18 @@ export async function updateSession(request: NextRequest) {
       return NextResponse.redirect(url);
     }
 
-    if (isPublic && pathname !== "/auth/callback" && !needsOnboarding) {
+    if (isPublic && !pathname.startsWith("/auth/") && emailConfirmed && !needsOnboarding) {
       const url = request.nextUrl.clone();
       url.pathname = "/";
       return NextResponse.redirect(url);
     }
 
-    if (isPublic && pathname !== "/auth/callback" && needsOnboarding) {
+    if (
+      isPublic &&
+      !pathname.startsWith("/auth/") &&
+      pathname !== "/verify-email" &&
+      needsOnboarding
+    ) {
       const url = request.nextUrl.clone();
       url.pathname = "/onboarding";
       return NextResponse.redirect(url);

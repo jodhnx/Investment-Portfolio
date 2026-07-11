@@ -3,34 +3,50 @@
 import { useState } from "react";
 import { Loader2, Mail } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
-import { mapAuthError, validateEmail } from "@/lib/auth/errors";
+import { getAuthCallbackUrl } from "@/lib/auth/url";
+import { mapAuthError } from "@/lib/auth/errors";
+import { validateEmail } from "@/lib/auth/validation";
 import { AuthLayout, AuthLink } from "@/components/auth/auth-layout";
+import { FormField } from "@/components/auth/form-fields";
+import { AuthAlert } from "@/components/auth/auth-alert";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
 import { toast } from "sonner";
 
 export default function ForgotPasswordPage() {
   const [email, setEmail] = useState("");
   const [loading, setLoading] = useState(false);
   const [sent, setSent] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [fieldError, setFieldError] = useState<string | undefined>();
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    setError(null);
+
     const emailErr = validateEmail(email);
-    if (emailErr) return toast.error(emailErr);
+    if (emailErr) {
+      setFieldError(emailErr);
+      return;
+    }
+    setFieldError(undefined);
 
     setLoading(true);
     const supabase = createClient();
-    const { error } = await supabase.auth.resetPasswordForEmail(email, {
-      redirectTo: `${window.location.origin}/reset-password`,
-    });
+    const { error: resetError } = await supabase.auth.resetPasswordForEmail(
+      email.trim(),
+      {
+        redirectTo: getAuthCallbackUrl({ type: "recovery" }),
+      }
+    );
     setLoading(false);
 
-    if (error) {
-      toast.error(mapAuthError(error.message));
+    if (resetError) {
+      const msg = mapAuthError(resetError.message, resetError.code);
+      setError(msg);
+      toast.error(msg);
       return;
     }
+
     setSent(true);
     toast.success("E-Mail gesendet!");
   };
@@ -38,11 +54,16 @@ export default function ForgotPasswordPage() {
   if (sent) {
     return (
       <AuthLayout title="E-Mail gesendet" subtitle="Prüfe dein Postfach">
-        <div className="flex flex-col items-center gap-4 text-center">
-          <Mail className="h-12 w-12 text-primary" />
+        <div className="flex flex-col items-center gap-4 text-center animate-in fade-in duration-500">
+          <div className="flex h-16 w-16 items-center justify-center rounded-full bg-primary/10">
+            <Mail className="h-8 w-8 text-primary" />
+          </div>
           <p className="text-sm text-muted-foreground">
             Wir haben einen Link zum Zurücksetzen des Passworts an{" "}
-            <strong>{email}</strong> gesendet.
+            <strong className="text-foreground">{email}</strong> gesendet.
+          </p>
+          <p className="text-xs text-muted-foreground">
+            Der Link ist 24 Stunden gültig. Prüfe auch den Spam-Ordner.
           </p>
           <AuthLink href="/login">Zurück zum Login</AuthLink>
         </div>
@@ -51,23 +72,33 @@ export default function ForgotPasswordPage() {
   }
 
   return (
-    <AuthLayout title="Passwort vergessen" subtitle="Wir senden dir einen Reset-Link">
+    <AuthLayout title="Passwort vergessen" subtitle="Wir senden dir einen sicheren Reset-Link">
+      {error && <AuthAlert message={error} />}
+
       <form onSubmit={handleSubmit} className="space-y-4">
-        <div className="space-y-2">
-          <Label htmlFor="email">E-Mail</Label>
-          <Input
-            id="email"
-            type="email"
-            placeholder="name@beispiel.de"
-            value={email}
-            onChange={(e) => setEmail(e.target.value)}
-            required
-          />
-        </div>
+        <FormField
+          id="email"
+          label="E-Mail"
+          type="email"
+          value={email}
+          onChange={setEmail}
+          error={fieldError}
+          placeholder="name@beispiel.de"
+          autoComplete="email"
+          required
+        />
         <Button type="submit" className="w-full" disabled={loading}>
-          {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : "Link senden"}
+          {loading ? (
+            <>
+              <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+              Wird gesendet…
+            </>
+          ) : (
+            "Reset-Link senden"
+          )}
         </Button>
       </form>
+
       <p className="text-center text-sm text-muted-foreground">
         <AuthLink href="/login">Zurück zum Login</AuthLink>
       </p>

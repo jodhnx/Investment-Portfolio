@@ -30,7 +30,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const refreshSession = useCallback(async () => {
     const supabase = createClient();
-    const { data: { session: s } } = await supabase.auth.getSession();
+    const {
+      data: { session: s },
+    } = await supabase.auth.getSession();
     setSession(s);
     setUser(s?.user ?? null);
   }, []);
@@ -51,11 +53,15 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       setUser(s?.user ?? null);
       setLoading(false);
 
-      if (event === "SIGNED_IN" && s) {
+      if (event === "SIGNED_IN" && s?.user?.email_confirmed_at) {
         await hydrate();
       }
       if (event === "SIGNED_OUT") {
         reset();
+      }
+      if (event === "TOKEN_REFRESHED" && s) {
+        setSession(s);
+        setUser(s.user);
       }
     });
 
@@ -64,7 +70,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const signOut = async () => {
     const supabase = createClient();
-    await supabase.auth.signOut();
+    await supabase.auth.signOut({ scope: "global" });
+    setUser(null);
+    setSession(null);
     reset();
   };
 
