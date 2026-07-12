@@ -4,7 +4,7 @@ import { useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
 import { Check, ChevronDown, Plus, Settings2 } from "lucide-react";
 import { usePortfolioStore } from "@/store/portfolio-store";
-import { selectActivePortfolio } from "@/lib/store-selectors";
+import { selectActivePortfolio, selectVisiblePortfolios } from "@/lib/store-selectors";
 import { getPortfolioIcon } from "@/config/portfolio-icons";
 import { PortfolioFormDialog } from "./portfolio-form-dialog";
 import { PortfolioManager } from "./portfolio-manager";
@@ -27,7 +27,7 @@ export function PortfolioSwitcher({ compact, className }: PortfolioSwitcherProps
   const [createOpen, setCreateOpen] = useState(false);
   const [manageOpen, setManageOpen] = useState(false);
 
-  const portfolios = usePortfolioStore((s) => s.portfolios.filter((p) => !p.archived));
+  const portfolios = usePortfolioStore(selectVisiblePortfolios);
   const active = usePortfolioStore(selectActivePortfolio);
   const activeId = usePortfolioStore((s) => s.activePortfolioId);
   const setActivePortfolio = usePortfolioStore((s) => s.setActivePortfolio);
