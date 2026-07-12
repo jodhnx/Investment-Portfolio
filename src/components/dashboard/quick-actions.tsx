@@ -2,10 +2,10 @@
 
 import { useState } from "react";
 import Link from "next/link";
-import { Plus, Layers, ArrowLeftRight, Calculator, Eye, Settings, Landmark } from "lucide-react";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Plus, Layers, ArrowLeftRight, Eye, Landmark, Calculator, Settings } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { CustomAssetDialog } from "@/components/assets/custom-asset-dialog";
+import { cn } from "@/lib/utils";
 
 const links = [
   { href: "/assets", label: "Assets", icon: Layers },
@@ -20,25 +20,33 @@ export function QuickActions() {
   const [assetOpen, setAssetOpen] = useState(false);
 
   return (
-    <Card className="border-border/60 bg-card/80">
-      <CardHeader className="pb-3">
-        <CardTitle className="text-base">Schnellzugriff</CardTitle>
-      </CardHeader>
-      <CardContent className="space-y-3">
-        <Button className="h-11 w-full gap-2" size="lg" onClick={() => setAssetOpen(true)}>
-          <Plus className="h-4 w-4" />
-          Neues Asset anlegen
-        </Button>
-        <CustomAssetDialog open={assetOpen} onOpenChange={setAssetOpen} hideTrigger />
-        <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
-          {links.map(({ href, label, icon: Icon }) => (
-            <Button key={href} variant="outline" className="h-11 gap-2" render={<Link href={href} />}>
-              <Icon className="h-4 w-4" />
-              {label}
-            </Button>
-          ))}
-        </div>
-      </CardContent>
-    </Card>
+    <div className="premium-card p-5">
+      <p className="mb-4 text-sm font-medium text-muted-foreground">Schnellzugriff</p>
+      <Button
+        className="mb-4 h-12 w-full rounded-2xl text-base font-medium"
+        size="lg"
+        onClick={() => setAssetOpen(true)}
+      >
+        <Plus className="mr-2 h-5 w-5" />
+        Asset hinzufügen
+      </Button>
+      <CustomAssetDialog open={assetOpen} onOpenChange={setAssetOpen} hideTrigger />
+      <div className="grid grid-cols-3 gap-2">
+        {links.map(({ href, label, icon: Icon }) => (
+          <Link
+            key={href}
+            href={href}
+            className={cn(
+              "flex flex-col items-center gap-2 rounded-2xl border border-border/50 bg-muted/30 px-2 py-3",
+              "text-center text-xs font-medium text-muted-foreground transition-all duration-200",
+              "hover:border-primary/30 hover:bg-primary/5 hover:text-primary active:scale-[0.98]"
+            )}
+          >
+            <Icon className="h-5 w-5" />
+            {label}
+          </Link>
+        ))}
+      </div>
+    </div>
   );
 }

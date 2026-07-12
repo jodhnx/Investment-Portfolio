@@ -16,7 +16,7 @@ export default function DashboardLayout({
       <Sidebar />
       <div className="flex min-w-0 flex-1 flex-col">
         <Header />
-        <main className="flex-1 overflow-y-auto overflow-x-hidden p-4 pb-[calc(5.5rem+env(safe-area-inset-bottom))] md:p-6 md:pb-6">
+        <main className="mx-auto w-full max-w-7xl flex-1 overflow-y-auto overflow-x-hidden px-4 py-6 pb-[calc(5.75rem+env(safe-area-inset-bottom))] md:px-8 md:py-8 md:pb-8">
           <PageTransition>{children}</PageTransition>
         </main>
         <BottomNav />

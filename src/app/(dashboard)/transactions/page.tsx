@@ -131,12 +131,10 @@ export default function TransactionsPage() {
     <div className="space-y-6">
       <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
         <div>
-          <h2 className="text-2xl font-bold tracking-tight">Transaktionen</h2>
-          <p className="text-sm text-muted-foreground">
-            Käufe, Verkäufe, Dividenden, Gebühren und Steuern
-          </p>
+          <h1 className="text-2xl font-semibold md:text-3xl">Transaktionen</h1>
+          <p className="mt-1 text-sm text-muted-foreground">Alle Buchungen im Portfolio</p>
         </div>
-        <Button className="h-11 gap-2" onClick={() => setDialogOpen(true)} disabled={!hasAssets}>
+        <Button className="h-11 gap-2 rounded-xl" onClick={() => setDialogOpen(true)} disabled={!hasAssets}>
           <Plus className="h-4 w-4" />
           Transaktion
         </Button>
@@ -152,7 +150,7 @@ export default function TransactionsPage() {
         />
       </div>
 
-      <div className="overflow-x-auto rounded-xl border border-border">
+      <div className="overflow-hidden rounded-2xl border border-border/50">
         <table className="w-full min-w-[640px] text-sm">
           <thead>
             {table.getHeaderGroups().map((hg) => (

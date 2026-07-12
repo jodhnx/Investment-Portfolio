@@ -206,7 +206,7 @@ export function DashboardWidgets({ portfolio, stats, snapshots }: DashboardWidge
     <div className="space-y-4">
       <div className="flex justify-end">
         <DropdownMenu>
-          <DropdownMenuTrigger className="inline-flex h-9 items-center justify-center gap-2 rounded-lg border border-border bg-background px-3 text-sm font-medium hover:bg-muted">
+          <DropdownMenuTrigger className="inline-flex h-10 items-center justify-center gap-2 rounded-xl border border-border/50 bg-card px-4 text-sm font-medium transition-colors hover:bg-muted">
             <Settings2 className="h-4 w-4" />
             Widgets
           </DropdownMenuTrigger>
@@ -226,7 +226,7 @@ export function DashboardWidgets({ portfolio, stats, snapshots }: DashboardWidge
 
       <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={onDragEnd}>
         <SortableContext items={visibleOrder} strategy={rectSortingStrategy}>
-          <div className="grid gap-4 lg:grid-cols-3">
+          <div className="grid gap-5 lg:grid-cols-3">
             {visibleOrder.map((id) => (
               <SortableWidget key={id} id={id}>
                 {renderWidget(id)}

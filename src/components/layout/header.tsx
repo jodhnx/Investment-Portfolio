@@ -64,32 +64,32 @@ export function Header() {
   };
 
   return (
-    <header className="sticky top-0 z-40 flex h-14 items-center gap-2 border-b border-border/80 bg-background/95 px-3 backdrop-blur-md supports-[backdrop-filter]:bg-background/80">
+    <header className="sticky top-0 z-40 flex h-14 items-center gap-2 border-b border-border/50 glass px-4 md:px-6">
       <div className="hidden min-w-0 flex-1 md:block">
-        <h1 className="truncate text-sm font-semibold">{getPageTitle(pathname)}</h1>
+        <h1 className="truncate text-base font-semibold">{getPageTitle(pathname)}</h1>
         {portfolio && (
-          <p className="truncate text-[11px] text-muted-foreground">{portfolio.name}</p>
+          <p className="truncate text-xs text-muted-foreground">{portfolio.name}</p>
         )}
       </div>
 
       <div className="flex min-w-0 flex-1 md:hidden">
-        <PortfolioSwitcher compact className="w-full border-0 bg-transparent p-0 hover:bg-transparent" />
+        <PortfolioSwitcher compact className="w-full border-0 bg-transparent p-0 shadow-none hover:bg-transparent" />
       </div>
 
       <GlobalSearch />
 
-      <Avatar className="h-8 w-8">
+      <Avatar className="h-9 w-9 ring-2 ring-border/50">
         <AvatarImage src={profile?.avatar ?? APP_ICON_PNG} />
-        <AvatarFallback className="text-[10px]">{APP_NAME.slice(0, 1)}</AvatarFallback>
+        <AvatarFallback className="text-xs">{APP_NAME.slice(0, 1)}</AvatarFallback>
       </Avatar>
 
-      <Button variant="ghost" size="icon" className="h-8 w-8" onClick={handleRefreshPrices}>
+      <Button variant="ghost" size="icon" className="h-9 w-9 rounded-xl" onClick={handleRefreshPrices}>
         <RefreshCw className="h-4 w-4" />
       </Button>
-      <Button variant="ghost" size="icon" className="h-8 w-8" onClick={toggleTheme}>
+      <Button variant="ghost" size="icon" className="h-9 w-9 rounded-xl" onClick={toggleTheme}>
         {theme === "dark" ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
       </Button>
-      <Button variant="ghost" size="icon" className="h-8 w-8" onClick={handleLogout}>
+      <Button variant="ghost" size="icon" className="h-9 w-9 rounded-xl" onClick={handleLogout}>
         <LogOut className="h-4 w-4" />
       </Button>
     </header>
