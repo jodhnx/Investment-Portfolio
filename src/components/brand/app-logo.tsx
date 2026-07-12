@@ -1,4 +1,4 @@
-import { APP_NAME, APP_ICON } from "@/config/brand";
+import { APP_NAME, APP_LOGO } from "@/config/brand";
 import { cn } from "@/lib/utils";
 
 interface AppLogoProps {
@@ -20,11 +20,12 @@ export function AppLogo({ size = "md", showName = true, className }: AppLogoProp
     <div className={cn("flex items-center gap-2.5", className)}>
       {/* eslint-disable-next-line @next/next/no-img-element */}
       <img
-        src={APP_ICON}
+        src={APP_LOGO}
         alt={APP_NAME}
         width={s.box}
         height={s.box}
-        className="shrink-0 rounded-xl"
+        className="shrink-0"
+        style={{ width: s.box, height: s.box }}
       />
       {showName && (
         <span className={cn("font-semibold tracking-tight", s.text)}>{APP_NAME}</span>

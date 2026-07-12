@@ -12,6 +12,7 @@ import type {
   Category,
   Dividend,
   Portfolio,
+  PortfolioInput,
   Position,
   PriceAlert,
   Transaction,
@@ -41,6 +42,12 @@ import {
   syncWatchlistDelete,
   syncWatchlistInsert,
 } from "@/lib/supabase/sync";
+import {
+  clearActivePortfolioId,
+  persistActivePortfolioId,
+  readActivePortfolioId,
+  resolveActivePortfolioId,
+} from "@/lib/portfolio-storage";
 import { positionFromSearch } from "@/lib/storage";
 
 const MAX_HISTORY = 50;
@@ -67,9 +74,12 @@ export interface PortfolioStore extends AppState {
   undo: () => void;
   redo: () => void;
   setActivePortfolio: (id: string) => void;
-  addPortfolio: (name: string) => void;
+  addPortfolio: (input: PortfolioInput) => void;
   updatePortfolio: (id: string, data: Partial<Portfolio>) => void;
   deletePortfolio: (id: string) => void;
+  duplicatePortfolio: (id: string) => void;
+  archivePortfolio: (id: string) => void;
+  setDefaultPortfolio: (id: string) => void;
   addPosition: (position: Position) => void;
   addPositionFromSearch: (asset: AssetSearchResult, watchlist?: boolean) => void;
   updatePosition: (id: string, data: Partial<Position>) => void;
@@ -151,9 +161,14 @@ export const usePortfolioStore = create<PortfolioStore>()(
           }
 
           lastHydratedUserId = user.id;
+          const activeId = resolveActivePortfolioId(
+            data.portfolios,
+            readActivePortfolioId(),
+            data.profile.active_portfolio_id
+          );
           set({
             portfolios: data.portfolios,
-            activePortfolioId: data.portfolios[0]?.id ?? "",
+            activePortfolioId: activeId,
             snapshots: data.snapshots,
             settings: data.settings,
             profile: data.profile,
@@ -177,6 +192,7 @@ export const usePortfolioStore = create<PortfolioStore>()(
 
     reset: () => {
       lastHydratedUserId = null;
+      clearActivePortfolioId();
       set({ ...emptyState, hydrated: false, profile: null, profileId: null });
     },
 
@@ -205,8 +221,8 @@ export const usePortfolioStore = create<PortfolioStore>()(
 
     redo: () => {
       const { historyIndex, history } = get();
-      if (historyIndex >= history.length - 2) return;
-      const next = history[historyIndex + 2];
+      if (historyIndex >= history.length - 1) return;
+      const next = history[historyIndex + 1];
       if (!next) return;
       set({ ...next, history, historyIndex: historyIndex + 1, profile: get().profile, profileId: get().profileId, hydrated: true });
     },
@@ -214,31 +230,69 @@ export const usePortfolioStore = create<PortfolioStore>()(
     getActivePortfolio: () =>
       get().portfolios.find((p) => p.id === get().activePortfolioId),
 
-    setActivePortfolio: (id) => set({ activePortfolioId: id }),
+    setActivePortfolio: (id) => {
+      const portfolio = get().portfolios.find((p) => p.id === id);
+      if (!portfolio || portfolio.archived) return;
+      persistActivePortfolioId(id);
+      set({ activePortfolioId: id });
+      const profileId = get().profileId;
+      if (profileId) {
+        syncProfileUpdate(profileId, { active_portfolio_id: id }).then(({ error }) =>
+          handleSyncError(error, "Portfolio wechseln")
+        );
+      }
+    },
 
-    addPortfolio: (name) => {
+    addPortfolio: (input) => {
       get().pushHistory();
       const profileId = get().profileId;
       if (!profileId) return;
+      const isFirst = get().portfolios.length === 0;
       const portfolio: Portfolio = {
         id: uuidv4(),
-        name,
-        currency: get().settings.defaultCurrency,
-        color: "#6366f1",
+        name: input.name.trim() || "Neues Portfolio",
+        description: input.description?.trim() || undefined,
+        currency: input.currency ?? get().settings.defaultCurrency,
+        color: input.color ?? "#2dd4bf",
+        icon: input.icon ?? "Briefcase",
+        startCapital: input.startCapital,
+        archived: false,
+        isDefault: isFirst,
         positions: [],
         categories: [],
         cashFlows: [],
         createdAt: new Date().toISOString(),
         updatedAt: new Date().toISOString(),
       };
+
+      if (input.startCapital && input.startCapital > 0) {
+        portfolio.cashFlows = [
+          {
+            id: uuidv4(),
+            type: "DEPOSIT",
+            amount: input.startCapital,
+            date: new Date().toISOString(),
+            category: "Startkapital",
+            notes: "Anfangskapital beim Erstellen",
+          },
+        ];
+      }
+
       set((s) => ({
         portfolios: [...s.portfolios, portfolio],
         activePortfolioId: portfolio.id,
         snapshots: { ...s.snapshots, [portfolio.id]: [] },
       }));
+      persistActivePortfolioId(portfolio.id);
+
       syncPortfolioInsert(profileId, portfolio).then(({ error }) =>
         handleSyncError(error, "Portfolio erstellen")
       );
+      portfolio.cashFlows?.forEach((flow) => {
+        syncCashFlowInsert(flow, portfolio.id).then(({ error }) =>
+          handleSyncError(error, "Startkapital speichern")
+        );
+      });
     },
 
     updatePortfolio: (id, data) => {
@@ -250,18 +304,104 @@ export const usePortfolioStore = create<PortfolioStore>()(
     },
 
     deletePortfolio: (id) => {
+      const active = get().portfolios.filter((p) => !p.archived);
+      if (active.length <= 1 && active.some((p) => p.id === id)) {
+        toast.error("Das letzte Portfolio kann nicht gelöscht werden.");
+        return;
+      }
       get().pushHistory();
       set((s) => {
         const portfolios = s.portfolios.filter((p) => p.id !== id);
-        return {
-          portfolios,
-          activePortfolioId:
-            s.activePortfolioId === id ? portfolios[0]?.id ?? "" : s.activePortfolioId,
-        };
+        const nextActive =
+          s.activePortfolioId === id
+            ? portfolios.find((p) => !p.archived)?.id ?? portfolios[0]?.id ?? ""
+            : s.activePortfolioId;
+        if (nextActive) persistActivePortfolioId(nextActive);
+        const { [id]: _, ...snapshots } = s.snapshots;
+        return { portfolios, activePortfolioId: nextActive, snapshots };
       });
       syncPortfolioDelete(id).then(({ error }) =>
         handleSyncError(error, "Portfolio löschen")
       );
+    },
+
+    duplicatePortfolio: (id) => {
+      const source = get().portfolios.find((p) => p.id === id);
+      const profileId = get().profileId;
+      if (!source || !profileId) return;
+      get().pushHistory();
+
+      const newId = uuidv4();
+      const positions = source.positions
+        .filter((p) => !p.isWatchlist)
+        .map((pos) => {
+          const newPosId = uuidv4();
+          return {
+            ...pos,
+            id: newPosId,
+            transactions: pos.transactions.map((tx) => ({ ...tx, id: uuidv4() })),
+            dividends: pos.dividends.map((d) => ({ ...d, id: uuidv4() })),
+            priceAlerts: [],
+            createdAt: new Date().toISOString(),
+            updatedAt: new Date().toISOString(),
+          };
+        });
+
+      const cashFlows = (source.cashFlows ?? []).map((c) => ({ ...c, id: uuidv4() }));
+
+      const copy: Portfolio = {
+        ...source,
+        id: newId,
+        name: `${source.name} (Kopie)`,
+        isDefault: false,
+        archived: false,
+        positions,
+        cashFlows,
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+      };
+
+      set((s) => ({
+        portfolios: [...s.portfolios, copy],
+        activePortfolioId: newId,
+        snapshots: { ...s.snapshots, [newId]: [...(s.snapshots[id] ?? [])] },
+      }));
+      persistActivePortfolioId(newId);
+
+      syncPortfolioInsert(profileId, copy).then(({ error }) => {
+        if (error) return handleSyncError(error, "Portfolio duplizieren");
+        positions.forEach((pos) => {
+          syncAssetInsert(pos, newId).then(() => {
+            pos.transactions.forEach((tx) => syncTransactionInsert(tx, pos.id));
+            pos.dividends.forEach((d) => syncDividendInsert(d, pos.id));
+          });
+        });
+        cashFlows.forEach((flow) => syncCashFlowInsert(flow, newId));
+      });
+      toast.success(`„${copy.name}" erstellt`);
+    },
+
+    archivePortfolio: (id) => {
+      const portfolio = get().portfolios.find((p) => p.id === id);
+      if (!portfolio) return;
+      get().updatePortfolio(id, { archived: true });
+      if (get().activePortfolioId === id) {
+        const next = get().portfolios.find((p) => p.id !== id && !p.archived);
+        if (next) get().setActivePortfolio(next.id);
+      }
+      toast.success(`„${portfolio.name}" archiviert`);
+    },
+
+    setDefaultPortfolio: (id) => {
+      get().pushHistory();
+      const all = get().portfolios;
+      set((s) => ({
+        portfolios: s.portfolios.map((p) => ({ ...p, isDefault: p.id === id })),
+      }));
+      all.forEach((p) => {
+        syncPortfolioUpdate(p.id, { isDefault: p.id === id });
+      });
+      toast.success("Standard-Portfolio gesetzt");
     },
 
     addPosition: (position) => {
@@ -275,7 +415,7 @@ export const usePortfolioStore = create<PortfolioStore>()(
         }))
       );
       if (position.isWatchlist && profileId) {
-        syncWatchlistInsert(profileId, position.id, {
+        syncWatchlistInsert(profileId, pid, position.id, {
           id: position.externalId ?? position.symbol,
           name: position.name,
           symbol: position.symbol,

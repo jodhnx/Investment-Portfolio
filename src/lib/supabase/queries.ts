@@ -13,7 +13,6 @@ import {
 export interface LoadedUserData {
   profile: Profile;
   portfolios: Portfolio[];
-  watchlistPortfolioId: string | null;
   snapshots: Record<string, PortfolioSnapshot[]>;
   settings: AppSettings;
 }
@@ -106,18 +105,19 @@ export async function loadUserData(): Promise<LoadedUserData | null> {
     return mapPortfolio(p, positions, flows);
   });
 
-  // Watchlist als virtuelles Portfolio anhängen
+  // Watchlist pro Portfolio zuordnen
   const watchlistItems = watchlist ?? [];
-  let watchlistPortfolioId: string | null = null;
-
-  if (watchlistItems.length > 0 && mappedPortfolios.length > 0) {
-    watchlistPortfolioId = mappedPortfolios[0].id;
-    const watchlistPositions = watchlistItems.map((w) =>
-      mapWatchlistToPosition(w, alertRows)
-    );
-    mappedPortfolios[0] = {
-      ...mappedPortfolios[0],
-      positions: [...mappedPortfolios[0].positions, ...watchlistPositions],
+  for (const w of watchlistItems) {
+    const portfolioId = w.portfolio_id ?? mappedPortfolios[0]?.id;
+    if (!portfolioId) continue;
+    const idx = mappedPortfolios.findIndex((p) => p.id === portfolioId);
+    if (idx === -1) continue;
+    mappedPortfolios[idx] = {
+      ...mappedPortfolios[idx],
+      positions: [
+        ...mappedPortfolios[idx].positions,
+        mapWatchlistToPosition(w, alertRows),
+      ],
     };
   }
 
@@ -136,7 +136,6 @@ export async function loadUserData(): Promise<LoadedUserData | null> {
   return {
     profile: profileRow,
     portfolios: mappedPortfolios,
-    watchlistPortfolioId,
     snapshots: snapshotMap,
     settings,
   };

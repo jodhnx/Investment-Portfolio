@@ -89,13 +89,27 @@ export interface Position {
 export interface Portfolio {
   id: string;
   name: string;
+  description?: string;
   currency: Currency;
   color?: string;
+  icon?: string;
+  startCapital?: number;
+  archived?: boolean;
+  isDefault?: boolean;
   positions: Position[];
   categories: Category[];
   cashFlows?: CashFlow[];
   createdAt: string;
   updatedAt: string;
+}
+
+export interface PortfolioInput {
+  name: string;
+  description?: string;
+  currency: Currency;
+  color?: string;
+  icon?: string;
+  startCapital?: number;
 }
 
 export interface PortfolioSnapshot {

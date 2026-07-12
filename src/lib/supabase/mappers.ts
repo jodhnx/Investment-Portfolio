@@ -128,8 +128,13 @@ export function mapPortfolio(
   return {
     id: row.id,
     name: row.name,
+    description: row.description ?? undefined,
     currency: row.currency as Currency,
     color: row.color ?? undefined,
+    icon: row.icon ?? "Briefcase",
+    startCapital: row.start_capital ? Number(row.start_capital) : undefined,
+    archived: row.archived ?? false,
+    isDefault: row.is_default ?? false,
     positions,
     categories: [],
     cashFlows,

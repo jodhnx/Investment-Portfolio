@@ -21,6 +21,7 @@ export interface Database {
           language: string;
           timezone: string | null;
           onboarding_complete: boolean;
+          active_portfolio_id: string | null;
           created_at: string;
           updated_at: string;
         };
@@ -60,6 +61,10 @@ export interface Database {
           description: string | null;
           color: string | null;
           currency: string;
+          icon: string | null;
+          start_capital: number | null;
+          archived: boolean;
+          is_default: boolean;
           created_at: string;
           updated_at: string;
         };
@@ -70,12 +75,20 @@ export interface Database {
           description?: string | null;
           color?: string | null;
           currency?: string;
+          icon?: string | null;
+          start_capital?: number | null;
+          archived?: boolean;
+          is_default?: boolean;
         };
         Update: {
           name?: string;
           description?: string | null;
           color?: string | null;
           currency?: string;
+          icon?: string | null;
+          start_capital?: number | null;
+          archived?: boolean;
+          is_default?: boolean;
         };
       };
       assets: {
@@ -185,6 +198,7 @@ export interface Database {
         Row: {
           id: string;
           profile_id: string;
+          portfolio_id: string | null;
           symbol: string;
           asset_name: string;
           asset_type: string;

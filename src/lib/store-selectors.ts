@@ -25,6 +25,10 @@ export function selectSnapshotsForActivePortfolio(state: PortfolioStore) {
   return state.snapshots[id] ?? EMPTY_SNAPSHOTS;
 }
 
+export function selectVisiblePortfolios(state: PortfolioStore) {
+  return state.portfolios.filter((p) => !p.archived);
+}
+
 export function selectProfile(state: PortfolioStore) {
   return state.profile;
 }

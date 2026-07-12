@@ -9,8 +9,9 @@ import { usePortfolioStore } from "@/store/portfolio-store";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { toast } from "sonner";
 import { GlobalSearch } from "./global-search";
+import { PortfolioSwitcher } from "@/components/portfolio/portfolio-switcher";
 import { getPageTitle } from "@/config/navigation";
-import { APP_ICON, APP_NAME } from "@/config/brand";
+import { APP_ICON_PNG, APP_NAME } from "@/config/brand";
 import { usePathname } from "next/navigation";
 
 export function Header() {
@@ -63,15 +64,22 @@ export function Header() {
   };
 
   return (
-    <header className="sticky top-0 z-40 flex h-12 items-center gap-2 border-b border-border bg-background px-3">
-      <h1 className="min-w-0 flex-1 truncate text-sm font-medium">
-        {getPageTitle(pathname)}
-      </h1>
+    <header className="sticky top-0 z-40 flex h-14 items-center gap-2 border-b border-border/80 bg-background/95 px-3 backdrop-blur-md supports-[backdrop-filter]:bg-background/80">
+      <div className="hidden min-w-0 flex-1 md:block">
+        <h1 className="truncate text-sm font-semibold">{getPageTitle(pathname)}</h1>
+        {portfolio && (
+          <p className="truncate text-[11px] text-muted-foreground">{portfolio.name}</p>
+        )}
+      </div>
+
+      <div className="flex min-w-0 flex-1 md:hidden">
+        <PortfolioSwitcher compact className="w-full border-0 bg-transparent p-0 hover:bg-transparent" />
+      </div>
 
       <GlobalSearch />
 
-      <Avatar className="h-7 w-7">
-        <AvatarImage src={profile?.avatar ?? APP_ICON} />
+      <Avatar className="h-8 w-8">
+        <AvatarImage src={profile?.avatar ?? APP_ICON_PNG} />
         <AvatarFallback className="text-[10px]">{APP_NAME.slice(0, 1)}</AvatarFallback>
       </Avatar>
 

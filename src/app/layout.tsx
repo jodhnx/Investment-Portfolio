@@ -6,7 +6,7 @@ import { ThemeProvider } from "@/components/providers/theme-provider";
 import { AuthProvider } from "@/components/providers/auth-provider";
 import { StoreHydrator } from "@/components/providers/store-hydrator";
 import { Toaster } from "@/components/ui/sonner";
-import { APP_DESCRIPTION, APP_NAME, APP_TAGLINE } from "@/config/brand";
+import { APP_DESCRIPTION, APP_NAME, APP_TAGLINE, APP_ICON_192, APP_ICON_PNG, APP_ICON } from "@/config/brand";
 import "./globals.css";
 
 const geistSans = Geist({
@@ -38,10 +38,13 @@ export const metadata: Metadata = {
   },
   icons: {
     icon: [
-      { url: "/icons/icon.png", sizes: "512x512", type: "image/png" },
-      { url: "/icons/icon.svg", type: "image/svg+xml" },
+      { url: APP_ICON_PNG, sizes: "512x512", type: "image/png" },
+      { url: APP_ICON, type: "image/svg+xml" },
     ],
-    apple: [{ url: "/icons/icon.png", sizes: "512x512", type: "image/png" }],
+    apple: [
+      { url: APP_ICON_192, sizes: "192x192", type: "image/png" },
+      { url: APP_ICON_PNG, sizes: "512x512", type: "image/png" },
+    ],
   },
 };
 

@@ -24,6 +24,7 @@ import {
 import { useTheme } from "@/components/providers/theme-provider";
 import type { Currency } from "@/lib/types";
 import { toast } from "sonner";
+import { PortfolioManager } from "@/components/portfolio/portfolio-manager";
 import { useRouter } from "next/navigation";
 
 export default function SettingsPage() {
@@ -42,6 +43,7 @@ export default function SettingsPage() {
   const [language, setLanguage] = useState(profile?.language ?? "de");
   const [newPassword, setNewPassword] = useState("");
   const [loading, setLoading] = useState(false);
+  const [portfolioManageOpen, setPortfolioManageOpen] = useState(false);
   const avatarRef = useRef<HTMLInputElement>(null);
 
   const handleSaveProfile = () => {
@@ -80,7 +82,7 @@ export default function SettingsPage() {
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
     a.href = url;
-    a.download = `investtrack_export_${new Date().toISOString().split("T")[0]}.json`;
+    a.download = `velo_export_${new Date().toISOString().split("T")[0]}.json`;
     a.click();
     URL.revokeObjectURL(url);
     toast.success("Daten exportiert");
@@ -125,6 +127,20 @@ export default function SettingsPage() {
       </div>
 
       <div className="grid gap-4 lg:grid-cols-2">
+        <Card className="lg:col-span-2">
+          <CardHeader>
+            <CardTitle>Portfolios</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <p className="mb-3 text-sm text-muted-foreground">
+              Erstellen, bearbeiten, duplizieren oder archivieren Sie Ihre Portfolios.
+            </p>
+            <Button variant="outline" onClick={() => setPortfolioManageOpen(true)}>
+              Portfolios verwalten
+            </Button>
+          </CardContent>
+        </Card>
+
         <Card>
           <CardHeader>
             <CardTitle className="text-base">Profil</CardTitle>
@@ -241,6 +257,7 @@ export default function SettingsPage() {
           </CardContent>
         </Card>
       </div>
+      <PortfolioManager open={portfolioManageOpen} onOpenChange={setPortfolioManageOpen} />
     </div>
   );
 }

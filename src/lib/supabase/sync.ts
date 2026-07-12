@@ -1,5 +1,5 @@
 import { createClient } from "@/lib/supabase/client";
-import type { AssetSearchResult, Dividend, Portfolio, Position, Transaction } from "@/lib/types";
+import type { AssetSearchResult, Dividend, Portfolio, PortfolioInput, Position, Transaction } from "@/lib/types";
 import {
   positionToAssetInsert,
   transactionToInsert,
@@ -13,23 +13,44 @@ function getSupabase() {
 
 export async function syncPortfolioInsert(
   profileId: string,
-  portfolio: Pick<Portfolio, "id" | "name" | "currency" | "color">
+  portfolio: Pick<
+    Portfolio,
+    "id" | "name" | "description" | "currency" | "color" | "icon" | "startCapital" | "isDefault"
+  >
 ): Promise<SyncResult> {
   const { error } = await getSupabase().from("portfolios").insert({
     id: portfolio.id,
     profile_id: profileId,
     name: portfolio.name,
+    description: portfolio.description ?? null,
     currency: portfolio.currency,
-    color: portfolio.color ?? "#6366f1",
+    color: portfolio.color ?? "#2dd4bf",
+    icon: portfolio.icon ?? "Briefcase",
+    start_capital: portfolio.startCapital ?? 0,
+    is_default: portfolio.isDefault ?? false,
   });
   return { error: error?.message ?? null };
 }
 
 export async function syncPortfolioUpdate(
   id: string,
-  data: Partial<Pick<Portfolio, "name" | "currency" | "color">>
+  data: Partial<
+    Pick<
+      Portfolio,
+      "name" | "description" | "currency" | "color" | "icon" | "startCapital" | "archived" | "isDefault"
+    >
+  >
 ): Promise<SyncResult> {
-  const { error } = await getSupabase().from("portfolios").update(data).eq("id", id);
+  const payload: Record<string, unknown> = {};
+  if (data.name !== undefined) payload.name = data.name;
+  if (data.description !== undefined) payload.description = data.description;
+  if (data.currency !== undefined) payload.currency = data.currency;
+  if (data.color !== undefined) payload.color = data.color;
+  if (data.icon !== undefined) payload.icon = data.icon;
+  if (data.startCapital !== undefined) payload.start_capital = data.startCapital;
+  if (data.archived !== undefined) payload.archived = data.archived;
+  if (data.isDefault !== undefined) payload.is_default = data.isDefault;
+  const { error } = await getSupabase().from("portfolios").update(payload).eq("id", id);
   return { error: error?.message ?? null };
 }
 
@@ -78,12 +99,14 @@ export async function syncAssetDelete(id: string): Promise<SyncResult> {
 
 export async function syncWatchlistInsert(
   profileId: string,
+  portfolioId: string,
   positionId: string,
   asset: AssetSearchResult
 ): Promise<SyncResult> {
   const { error } = await getSupabase().from("watchlist").insert({
     id: positionId,
     profile_id: profileId,
+    portfolio_id: portfolioId,
     symbol: asset.symbol,
     asset_name: asset.name,
     asset_type: asset.type,
@@ -244,6 +267,7 @@ export async function syncProfileUpdate(
     currency?: string;
     country?: string;
     language?: string;
+    active_portfolio_id?: string;
   }
 ): Promise<SyncResult> {
   const { error } = await getSupabase()
