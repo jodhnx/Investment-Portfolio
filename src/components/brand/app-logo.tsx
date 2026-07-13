@@ -8,13 +8,14 @@ interface AppLogoProps {
 }
 
 const sizes = {
-  sm: { box: 32, text: "text-base" },
-  md: { box: 40, text: "text-lg" },
-  lg: { box: 56, text: "text-2xl" },
+  sm: 32,
+  md: 40,
+  lg: 56,
 };
 
 export function AppLogo({ size = "md", showName = true, className }: AppLogoProps) {
-  const s = sizes[size];
+  const box = sizes[size];
+  const textSize = size === "sm" ? "text-base" : size === "lg" ? "text-2xl" : "text-lg";
 
   return (
     <div className={cn("flex items-center gap-2.5", className)}>
@@ -22,13 +23,15 @@ export function AppLogo({ size = "md", showName = true, className }: AppLogoProp
       <img
         src={APP_LOGO}
         alt={APP_NAME}
-        width={s.box}
-        height={s.box}
-        className="shrink-0"
-        style={{ width: s.box, height: s.box }}
+        width={box}
+        height={box}
+        className="aspect-square shrink-0 object-contain"
+        style={{ width: box, height: box }}
+        decoding="async"
+        data-brand-icon
       />
       {showName && (
-        <span className={cn("font-semibold tracking-tight", s.text)}>{APP_NAME}</span>
+        <span className={cn("font-semibold tracking-tight", textSize)}>{APP_NAME}</span>
       )}
     </div>
   );

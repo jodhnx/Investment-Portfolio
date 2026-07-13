@@ -11,7 +11,7 @@ import { toast } from "sonner";
 import { GlobalSearch } from "./global-search";
 import { PortfolioSwitcher } from "@/components/portfolio/portfolio-switcher";
 import { getPageTitle } from "@/config/navigation";
-import { APP_ICON_PNG, APP_NAME } from "@/config/brand";
+import { AppIcon } from "@/components/brand/app-icon";
 import { usePathname } from "next/navigation";
 
 export function Header() {
@@ -79,8 +79,12 @@ export function Header() {
       <GlobalSearch />
 
       <Avatar className="h-9 w-9 ring-2 ring-border/50">
-        <AvatarImage src={profile?.avatar ?? APP_ICON_PNG} />
-        <AvatarFallback className="text-xs">{APP_NAME.slice(0, 1)}</AvatarFallback>
+        {profile?.avatar ? (
+          <AvatarImage src={profile.avatar} className="object-cover" />
+        ) : null}
+        <AvatarFallback className="bg-transparent p-0">
+          <AppIcon size={36} variant="app" className="rounded-lg" />
+        </AvatarFallback>
       </Avatar>
 
       <Button variant="ghost" size="icon" className="h-9 w-9 rounded-xl" onClick={handleRefreshPrices}>

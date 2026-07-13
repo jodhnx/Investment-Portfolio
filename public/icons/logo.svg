@@ -1,6 +1,9 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" fill="none">
-  <circle cx="256" cy="256" r="168" stroke="#2dd4bf" stroke-width="16" opacity="0.25"/>
-  <circle cx="256" cy="256" r="112" stroke="#2dd4bf" stroke-width="12"/>
-  <circle cx="352" cy="192" r="36" fill="#2dd4bf"/>
-  <circle cx="256" cy="256" r="20" fill="#2dd4bf" opacity="0.6"/>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" fill="none" role="img" aria-label="Velo">
+  <!-- Transparentes Markenzeichen, zentriert mit Safe-Zone -->
+  <g transform="translate(256 256)">
+    <circle r="158" stroke="#2dd4bf" stroke-width="14" opacity="0.28"/>
+    <circle r="104" stroke="#2dd4bf" stroke-width="10"/>
+    <circle cx="94" cy="-62" r="30" fill="#2dd4bf"/>
+    <circle r="17" fill="#2dd4bf" opacity="0.55"/>
+  </g>
 </svg>

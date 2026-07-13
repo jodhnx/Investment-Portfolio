@@ -134,6 +134,9 @@
     -webkit-tap-highlight-color: transparent;
     touch-action: manipulation;
   }
+  img[data-brand-icon] {
+    @apply aspect-square object-contain;
+  }
 }
 
 @layer utilities {
