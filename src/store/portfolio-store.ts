@@ -26,6 +26,7 @@ import {
   syncAssetInsert,
   syncAssetUpdate,
   syncDividendInsert,
+  syncDividendUpdate,
   syncPortfolioDelete,
   syncPortfolioInsert,
   syncPortfolioUpdate,
@@ -88,6 +89,7 @@ export interface PortfolioStore extends AppState {
   updateTransaction: (positionId: string, txId: string, data: Partial<Transaction>) => void;
   deleteTransaction: (positionId: string, txId: string) => void;
   addDividend: (positionId: string, div: Omit<Dividend, "id">) => void;
+  updateDividend: (positionId: string, divId: string, data: Partial<Dividend>) => void;
   deleteDividend: (positionId: string, divId: string) => void;
   addCashFlow: (flow: Omit<CashFlow, "id">) => void;
   updateCashFlow: (id: string, data: Partial<CashFlow>) => void;
@@ -573,6 +575,34 @@ export const usePortfolioStore = create<PortfolioStore>()(
       syncDividendInsert(dividend, positionId).then(({ error }) =>
         handleSyncError(error, "Dividende speichern")
       );
+    },
+
+    updateDividend: (positionId, divId, data) => {
+      get().pushHistory();
+      const pid = get().activePortfolioId;
+      let updated: Dividend | undefined;
+      set((s) =>
+        withUpdatedPortfolio(s, pid, (p) => ({
+          ...p,
+          positions: p.positions.map((pos) => {
+            if (pos.id !== positionId) return pos;
+            return {
+              ...pos,
+              dividends: pos.dividends.map((d) => {
+                if (d.id !== divId) return d;
+                updated = { ...d, ...data };
+                return updated;
+              }),
+              updatedAt: new Date().toISOString(),
+            };
+          }),
+        }))
+      );
+      if (updated) {
+        syncDividendUpdate(updated, positionId).then(({ error }) =>
+          handleSyncError(error, "Dividende aktualisieren")
+        );
+      }
     },
 
     deleteDividend: (positionId, divId) => {

@@ -171,6 +171,19 @@ export async function syncDividendInsert(
   return { error: error?.message ?? null };
 }
 
+export async function syncDividendUpdate(div: Dividend, assetId: string): Promise<SyncResult> {
+  const { error } = await getSupabase()
+    .from("dividends")
+    .update({
+      asset_id: assetId,
+      amount: div.amount,
+      date: div.date,
+      notes: div.notes ?? null,
+    })
+    .eq("id", div.id);
+  return { error: error?.message ?? null };
+}
+
 export async function syncDividendDelete(id: string): Promise<SyncResult> {
   const { error } = await getSupabase().from("dividends").delete().eq("id", id);
   return { error: error?.message ?? null };
